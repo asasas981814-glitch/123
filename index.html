@@ -85,7 +85,7 @@
     <div id="admin-btns" style="background:#222; padding:20px; border-radius:15px; margin-bottom: 20px;"></div>
     <button onclick="calculateResult()" style="background:var(--success); color:white; width:85%; padding:25px; font-size:32px; border:none; border-radius:15px; font-weight: bold; cursor: pointer;">💥 全員發動攻擊！</button>
     <br><br>
-    <button onclick="resetGame()" style="background:#c0392b; color:white; padding:12px 24px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場 (清除名字)</button>
+    <button onclick="resetGame()" style="background:#c0392b; color:white; padding:12px 24px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場 (全體重置)</button>
 </div>
 
 <script>
@@ -140,11 +140,14 @@
         for(let i=1; i<=10; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="margin:5px; padding:12px; cursor:pointer;">第 ${i} 題</button>`;
     }
 
+    // 重置監聽 (適用於玩家與顯示端)
     db.ref('resetTrigger').on('value', snap => {
-        if(snap.val() === true && role === 'player') {
-            if(localStorage.getItem('boss_player_name')) {
+        if(snap.val() === true) {
+            if(role === 'player' && localStorage.getItem('boss_player_name')) {
                 localStorage.removeItem('boss_player_name');
                 location.reload();
+            } else if(role === 'display') {
+                location.reload(); // 顯示端直接重新整理，回到 READY 畫面
             }
         }
     });
@@ -164,13 +167,20 @@
             const vbgm = document.getElementById('victory-bgm');
             document.getElementById('hp-bar').style.width = (state.hp/12000*100) + "%";
             document.getElementById('hp-text').innerText = state.hp;
+            
             if(state.hp <= 0) {
-                bossImg.src = "Boss_hurt.png"; bossImg.style.transform = "scale(0) rotate(720deg)";
+                bossImg.src = "Boss_hurt.png"; 
+                bossImg.style.transform = "scale(0) rotate(720deg)";
                 confetti({ particleCount: 300, spread: 160 });
                 bgm.pause(); if(vbgm.paused) vbgm.play().catch(e => {});
-                findMVP(); document.getElementById('round-num').innerText = "VICTORY!";
-            } else if(state.hp <= 6000) { bossImg.src = "Boss_angry.png"; }
-            else { bossImg.src = "Boss_normal.png"; }
+                findMVP(); 
+                document.getElementById('round-num').innerText = "VICTORY!";
+                document.getElementById('msg-box').innerHTML = ""; // 獲勝時清空答對率訊息
+            } else if(state.hp <= 6000) { 
+                bossImg.src = "Boss_angry.png"; 
+            } else { 
+                bossImg.src = "Boss_normal.png"; 
+            }
 
             if(state.status === 'answering') {
                 const q = questionBank[state.q];
@@ -179,6 +189,7 @@
                 document.getElementById('d-title').innerText = q.t;
                 document.getElementById('d-options').innerHTML = `<div>A: ${q.o.A}</div><div>B: ${q.o.B}</div><div>C: ${q.o.C}</div><div>D: ${q.o.D}</div>`;
                 document.getElementById('msg-box').innerHTML = "";
+                document.getElementById('round-num').innerText = "ATTACK!";
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
                 if(state.lastDmg > 0) {
@@ -192,11 +203,12 @@
                         document.getElementById('display-view').classList.remove('hurt-flash');
                     }, 1000);
                 }
-                // 顯示答對率與傷害
                 document.getElementById('msg-box').innerHTML = `
                     <div style="color: #2ecc71;">集氣成功率：${state.correctRate || 0}%</div>
                     <div style="font-size: 45px; color: #e74c3c;">造成傷害：${state.lastDmg}</div>
                 `;
+            } else if(state.status === 'waiting') {
+                document.getElementById('round-num').innerText = "READY?";
             }
         }
         if(role === 'player') {
@@ -281,13 +293,13 @@
     }
 
     function resetGame() {
-        if(confirm("確定重置？")) {
+        if(confirm("確定重置？這會讓大螢幕回到初始畫面，並要求玩家重新簽到。")) {
             db.ref('resetTrigger').set(true).then(() => {
                 db.ref('/').update({
                     gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0 },
                     responses: null, history: null, players: null
                 });
-                setTimeout(() => db.ref('resetTrigger').set(false), 500);
+                setTimeout(() => db.ref('resetTrigger').set(false), 800);
             });
         }
     }
