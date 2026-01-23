@@ -76,8 +76,8 @@
         <h2 id="d-title" style="margin-top:0; font-size: 40px; border-bottom: 2px solid #555; padding-bottom: 15px;"></h2>
         <div class="option-grid" id="d-options"></div>
     </div>
-    <div id="msg-box" style="font-size: 38px; font-weight: bold; color: #f1c40f; margin-top: 20px; min-height: 50px;"></div>
-    <div id="vote-count" style="color: #888; font-size: 22px; margin-top: 15px;">已集結戰力: 0</div>
+    <div id="msg-box" style="font-size: 38px; font-weight: bold; color: #f1c40f; margin-top: 20px; min-height: 100px; text-shadow: 2px 2px 4px #000;"></div>
+    <div id="vote-count" style="color: #888; font-size: 22px; margin-top: 15px;">已集結戰士: 0</div>
 </div>
 
 <div id="admin-view" class="hidden" style="text-align: center; padding: 20px;">
@@ -115,8 +115,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const role = new URLSearchParams(window.location.search).get('role') || 'player';
-
-    // 生成唯一 UID
     const uid = localStorage.getItem('game_uid') || Math.random().toString(36).substring(7);
     localStorage.setItem('game_uid', uid);
 
@@ -124,20 +122,16 @@
         const name = document.getElementById('player-name-input').value.trim();
         if(!name) return alert("請輸入戰士名！");
         localStorage.setItem('boss_player_name', name);
-        // 向 Firebase 登記在線玩家
         db.ref('players/' + uid).set(name);
         document.getElementById('name-overlay').classList.add('hidden');
         document.getElementById('player-view').classList.remove('hidden');
-        document.getElementById('welcome-msg').innerText = "你好, " + name + "！⚔️";
     }
 
     if(role === 'player' && !localStorage.getItem('boss_player_name')) {
         document.getElementById('name-overlay').classList.remove('hidden');
     } else if(role === 'player') {
         document.getElementById('player-view').classList.remove('hidden');
-        const name = localStorage.getItem('boss_player_name');
-        document.getElementById('welcome-msg').innerText = "你好, " + name + "！⚔️";
-        db.ref('players/' + uid).set(name); // 確保重新整理後依然在線
+        db.ref('players/' + uid).set(localStorage.getItem('boss_player_name'));
     } else if(role === 'display') {
         document.getElementById('display-view').classList.remove('hidden');
     } else if(role === 'admin') {
@@ -158,13 +152,8 @@
     function toggleBGM() {
         const bgm = document.getElementById('game-bgm');
         const vbgm = document.getElementById('victory-bgm');
-        if (bgm.paused && vbgm.paused) {
-            bgm.play();
-            document.getElementById('bgm-control').innerText = "⏸ 暫停音效";
-        } else {
-            bgm.pause(); vbgm.pause();
-            document.getElementById('bgm-control').innerText = "▶ 播放音效";
-        }
+        if (bgm.paused && vbgm.paused) { bgm.play(); document.getElementById('bgm-control').innerText = "⏸ 暫停音效"; }
+        else { bgm.pause(); vbgm.pause(); document.getElementById('bgm-control').innerText = "▶ 播放音效"; }
     }
 
     db.ref('gameState').on('value', snap => {
@@ -189,7 +178,7 @@
                 document.getElementById('display-q-box').classList.remove('hidden');
                 document.getElementById('d-title').innerText = q.t;
                 document.getElementById('d-options').innerHTML = `<div>A: ${q.o.A}</div><div>B: ${q.o.B}</div><div>C: ${q.o.C}</div><div>D: ${q.o.D}</div>`;
-                document.getElementById('msg-box').innerText = "";
+                document.getElementById('msg-box').innerHTML = "";
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
                 if(state.lastDmg > 0) {
@@ -203,7 +192,11 @@
                         document.getElementById('display-view').classList.remove('hurt-flash');
                     }, 1000);
                 }
-                document.getElementById('msg-box').innerText = `造成 ${state.lastDmg} 傷害！`;
+                // 顯示答對率與傷害
+                document.getElementById('msg-box').innerHTML = `
+                    <div style="color: #2ecc71;">集氣成功率：${state.correctRate || 0}%</div>
+                    <div style="font-size: 45px; color: #e74c3c;">造成傷害：${state.lastDmg}</div>
+                `;
             }
         }
         if(role === 'player') {
@@ -221,12 +214,8 @@
         }
     });
 
-    // 大螢幕統計：改為監聽 players 節點 (顯示總在線人數)
     db.ref('players').on('value', snap => {
-        if(role === 'display') {
-            const count = snap.numChildren();
-            document.getElementById('vote-count').innerText = `已集結戰士: ${count}`;
-        }
+        if(role === 'display') document.getElementById('vote-count').innerText = `已集結戰士: ${snap.numChildren()}`;
     });
 
     function findMVP() {
@@ -258,15 +247,13 @@
 
     function changeQ(num) {
         db.ref('responses').remove();
-        db.ref('gameState').update({ q: num, status: 'answering', lastDmg: 0 });
+        db.ref('gameState').update({ q: num, status: 'answering', lastDmg: 0, correctRate: 0 });
     }
 
     function submitAns(ans) {
-        const name = localStorage.getItem('boss_player_name');
-        db.ref('responses/' + uid).set({ ans: ans, name: name });
+        db.ref('responses/' + uid).set({ ans: ans, name: localStorage.getItem('boss_player_name') });
         document.getElementById('player-q-zone').classList.add('hidden');
         document.getElementById('player-waiting').classList.remove('hidden');
-        document.getElementById('wait-msg').innerText = "集氣完成！💥";
     }
 
     function calculateResult() {
@@ -277,22 +264,28 @@
             const qData = questionBank[qNum];
             db.ref('history').push({ qNum: qNum, players: resps });
             const players = Object.values(resps);
-            if(players.length === 0) return alert("還沒人集氣！");
-            let correct = (qData.a === "ALL") ? players.length : players.filter(p => p.ans === qData.a).length;
-            let dmg = Math.floor((correct / players.length) * 1500);
-            db.ref('gameState').update({ status: 'result', hp: Math.max(0, data.gameState.hp - dmg), lastDmg: dmg });
+            if(players.length === 0) return alert("沒人集氣！");
+            
+            let correctCount = (qData.a === "ALL") ? players.length : players.filter(p => p.ans === qData.a).length;
+            let rate = Math.round((correctCount / players.length) * 100);
+            let dmg = Math.floor((rate / 100) * 1500);
+            
+            db.ref('gameState').update({ 
+                status: 'result', 
+                hp: Math.max(0, data.gameState.hp - dmg), 
+                lastDmg: dmg,
+                correctRate: rate 
+            });
             db.ref('responses').remove();
         });
     }
 
     function resetGame() {
-        if(confirm("確定重置？這會清空數據並要求所有人重新輸入名字。")) {
+        if(confirm("確定重置？")) {
             db.ref('resetTrigger').set(true).then(() => {
                 db.ref('/').update({
-                    gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0 },
-                    responses: null,
-                    history: null,
-                    players: null // 一併清空在線玩家列表
+                    gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0 },
+                    responses: null, history: null, players: null
                 });
                 setTimeout(() => db.ref('resetTrigger').set(false), 500);
             });
