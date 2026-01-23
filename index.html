@@ -22,7 +22,7 @@
         #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff4b2b, #ff416c); transition: width 0.8s ease-out; }
         
         /* 玩家樣式 */
-        .player-btn { background: var(--primary); color: white; border: none; padding: 25px; font-size: 20px; border-radius: 12px; font-weight: bold; cursor: pointer; }
+        .player-btn { background: var(--primary); color: white; border: none; padding: 25px; font-size: 20px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; }
         .player-btn:active { transform: scale(0.95); background: #d35400; }
         .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; }
 
@@ -37,10 +37,10 @@
 <div id="player-view" class="hidden">
     <div id="player-waiting" style="margin-top: 100px;">
         <h2>準備好了嗎？</h2>
-        <p>請看大螢幕題目...</p>
+        <p>請等待主持人發布題目...</p>
     </div>
     <div id="player-q-zone" class="hidden">
-        <h3 id="p-title" style="padding: 0 15px;">題目載入中...</h3>
+        <h3 id="p-title" style="padding: 15px;">題目載入中...</h3>
         <div class="btn-grid">
             <button class="player-btn" onclick="submitAns('A')">A. <span id="pa"></span></button>
             <button class="player-btn" onclick="submitAns('B')">B. <span id="pb"></span></button>
@@ -72,25 +72,25 @@
     <div class="admin-box" id="admin-btns"></div>
     <div class="admin-box">
         <button onclick="calculateResult()" style="background: var(--success); width: 100%; padding: 15px; font-size: 18px; color: white; border: none; border-radius: 5px;">💥 結算本題並攻擊</button>
-        <button onclick="resetGame()" style="margin-top: 20px; background: var(--danger); color: white; border: none; padding: 5px;">♻️ 重置全場</button>
+        <button onclick="resetGame()" style="margin-top: 20px; background: var(--danger); color: white; border: none; padding: 5px; cursor: pointer;">♻️ 重置全場</button>
     </div>
 </div>
 
 <script>
-    // --- STEP 1: 請在此填入你的 Firebase 配置 ---
+    // --- STEP 1: 配置 ---
     const firebaseConfig = {
         apiKey: "AIzaSyDwwKME2_neH-VxZObTStJ_uRuJI_-C-tw",
-  authDomain: "department-boss-battle.firebaseapp.com",
-  databaseURL: "https://department-boss-battle-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "department-boss-battle",
-  storageBucket: "department-boss-battle.firebasestorage.app",
-  messagingSenderId: "112990000902",
-  appId: "1:112990000902:web:5b003355322134537e3087"
+        authDomain: "department-boss-battle.firebaseapp.com",
+        databaseURL: "https://department-boss-battle-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "department-boss-battle",
+        storageBucket: "department-boss-battle.firebasestorage.app",
+        messagingSenderId: "112990000902",
+        appId: "1:112990000902:web:5b003355322134537e3087"
     };
 
     // --- STEP 2: 題目數據 ---
     const questionBank = {
-        1: { t: "請問主持人帥嗎?", o: {A:"帥", B:"很帥", C:"超帥", D:"特別帥"}, a: "ALL" }, // 特殊處理：全對
+        1: { t: "請問主持人帥嗎?", o: {A:"帥", B:"很帥", C:"超帥", D:"特別帥"}, a: "ALL" },
         2: { t: "Moxa在哪裡?", o: {A:"板橋", B:"新莊", C:"中和", D:"永和"}, a: "B" },
         3: { t: "我們是甚麼股份有限公司?", o: {A:"101", B:"202", C:"303", D:"404"}, a: "D" },
         4: { t: "CE全稱?", o: {A:"Common Era", B:"Civil Engineer", C:"Component Engineer", D:"Computer Engineer"}, a: "C" },
@@ -105,11 +105,14 @@
     // --- 初始化 ---
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const role = new URLSearchParams(window.location.search).get('role');
+    const urlParams = new URLSearchParams(window.location.search);
+    const role = urlParams.get('role') || 'player'; 
 
+    // 介面切換
     if(role === 'admin') {
         document.getElementById('admin-view').classList.remove('hidden');
         const btnContainer = document.getElementById('admin-btns');
+        btnContainer.innerHTML = ''; 
         for(let i=1; i<=10; i++) {
             btnContainer.innerHTML += `<button class="admin-op" onclick="changeQ(${i})">發布第 ${i} 題</button>`;
         }
@@ -151,8 +154,10 @@
                 waiting.classList.add('hidden');
                 zone.classList.remove('hidden');
                 document.getElementById('p-title').innerText = qData.t;
-                document.getElementById('pa').innerText = qData.o.A; document.getElementById('pb').innerText = qData.o.B;
-                document.getElementById('pc').innerText = qData.o.C; document.getElementById('pd').innerText = qData.o.D;
+                document.getElementById('pa').innerText = qData.o.A; 
+                document.getElementById('pb').innerText = qData.o.B;
+                document.getElementById('pc').innerText = qData.o.C; 
+                document.getElementById('pd').innerText = qData.o.D;
             } else {
                 waiting.classList.remove('hidden');
                 zone.classList.add('hidden');
@@ -175,19 +180,22 @@
         localStorage.setItem('game_uid', uid);
         db.ref('responses/' + uid).set(ans);
         document.getElementById('player-q-zone').classList.add('hidden');
+        document.getElementById('player-waiting').innerHTML = "<h2>已送出答案！</h2><p>請等待大螢幕結算...</p>";
         document.getElementById('player-waiting').classList.remove('hidden');
     }
 
     function calculateResult() {
         db.ref().once('value', snap => {
             const data = snap.val();
+            if(!data.gameState || data.gameState.status !== 'answering') return alert("請先發布題目！");
+            
             const qData = questionBank[data.gameState.q];
             const resps = Object.values(data.responses || {});
-            if(resps.length === 0) return alert("沒人投票！");
+            if(resps.length === 0) return alert("還沒有人投票！");
 
             let correctCount = 0;
             if(qData.a === "ALL") {
-                correctCount = resps.length; // 第1題選什麼都對
+                correctCount = resps.length;
             } else {
                 correctCount = resps.filter(a => a === qData.a).length;
             }
@@ -210,8 +218,11 @@
     }
 
     function resetGame() {
-        if(confirm("確定重置遊戲？")) {
-            db.ref('/').set({ gameState: { q: 0, status: 'waiting', hp: 12000 } });
+        if(confirm("確定要徹底重置遊戲與血量嗎？")) {
+            db.ref('/').set({ 
+                gameState: { q: 0, status: 'waiting', hp: 12000, lastDmg: 0 } 
+            });
+            location.reload();
         }
     }
 </script>
