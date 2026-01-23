@@ -26,12 +26,12 @@
         @keyframes float-up { 0% { opacity: 1; transform: translate(-50%, 0) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -120px) scale(1.2); } }
         
         /* 統計圖表樣式 */
-        .stat-container { display: flex; flex-direction: column; align-items: center; margin-top: 20px; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; }
-        .stat-row { display: flex; align-items: center; width: 100%; max-width: 600px; margin: 5px 0; font-size: 20px; }
-        .stat-label { width: 40px; font-weight: bold; }
-        .stat-bar-bg { flex-grow: 1; background: #333; height: 20px; border-radius: 10px; margin: 0 15px; overflow: hidden; }
+        .stat-container { display: flex; flex-direction: column; align-items: center; margin-top: 20px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; }
+        .stat-row { display: flex; align-items: center; width: 100%; max-width: 750px; margin: 8px 0; font-size: 22px; }
+        .stat-label { width: 180px; font-weight: bold; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .stat-bar-bg { flex-grow: 1; background: #333; height: 24px; border-radius: 12px; margin: 0 15px; overflow: hidden; }
         .stat-bar-fill { height: 100%; background: var(--primary); transition: width 1s ease-out; }
-        .stat-value { width: 100px; text-align: right; font-size: 18px; color: #aaa; }
+        .stat-value { width: 120px; text-align: right; font-size: 20px; color: #f1c40f; font-weight: bold; }
 
         #name-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         input[type="text"] { padding: 15px; font-size: 20px; border-radius: 10px; border: none; margin-bottom: 20px; width: 80%; max-width: 300px; text-align: center; }
@@ -217,9 +217,10 @@
                     }, 1000);
                 }
                 
-                // 統計數據渲染
+                // 統計數據渲染 (新增完整選項文字顯示)
                 const stats = state.stats || { A:0, B:0, C:0, D:0 };
                 const total = (stats.A + stats.B + stats.C + stats.D) || 1;
+                const currentQ = questionBank[state.q];
                 const getW = (v) => (v / total * 100) + "%";
 
                 document.getElementById('msg-box').innerHTML = `
@@ -228,10 +229,10 @@
                         <div style="font-size: 50px; color: #e74c3c; margin-bottom:15px;">造成傷害：${state.lastDmg}</div>
                     </div>
                     <div class="stat-container">
-                        <div style="font-size:22px; color:var(--primary); margin-bottom:10px;">📊 戰士集氣分佈</div>
+                        <div style="font-size:24px; color:var(--primary); margin-bottom:15px; font-weight:bold;">📊 戰士集氣分佈</div>
                         ${['A','B','C','D'].map(opt => `
                             <div class="stat-row">
-                                <div class="stat-label">${opt}</div>
+                                <div class="stat-label">${opt}: ${currentQ.o[opt]}</div>
                                 <div class="stat-bar-bg"><div class="stat-bar-fill" style="width: ${getW(stats[opt])}"></div></div>
                                 <div class="stat-value">${stats[opt]} 人 (${Math.round(stats[opt]/total*100)}%)</div>
                             </div>
@@ -313,7 +314,6 @@
             const players = Object.values(resps);
             if(players.length === 0) return alert("沒人集氣！");
             
-            // 統計各選項人數
             const stats = { A:0, B:0, C:0, D:0 };
             players.forEach(p => { if(stats[p.ans] !== undefined) stats[p.ans]++; });
             
