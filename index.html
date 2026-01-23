@@ -33,9 +33,9 @@
 
         /* 姓名輸入框 */
         #name-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        input[type="text"] { padding: 15px; font-size: 20px; border-radius: 10px; border: none; margin-bottom: 20px; width: 80%; max-width: 300px; }
+        input[type="text"] { padding: 15px; font-size: 20px; border-radius: 10px; border: none; margin-bottom: 20px; width: 80%; max-width: 300px; text-align: center; }
         
-        .player-btn { background: linear-gradient(145deg, #f39c12, #e67e22); color: white; border: none; padding: 25px; font-size: 24px; border-radius: 20px; font-weight: bold; width: 100%; }
+        .player-btn { background: linear-gradient(145deg, #f39c12, #e67e22); color: white; border: none; padding: 25px; font-size: 24px; border-radius: 20px; font-weight: bold; width: 100%; cursor: pointer; }
         #bgm-control { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.5); color: white; border: 1px solid #555; padding: 10px; border-radius: 10px; z-index: 1000; cursor: pointer; }
     </style>
 </head>
@@ -45,7 +45,7 @@
 
 <div id="name-overlay" class="hidden">
     <h2 style="color: var(--primary);">輸入戰士名稱</h2>
-    <input type="text" id="player-name-input" placeholder="例如：Boozer">
+    <input type="text" id="player-name-input" placeholder="請輸入姓名...">
     <button class="player-btn" style="width: 200px;" onclick="saveName()">進入戰場</button>
 </div>
 
@@ -77,22 +77,23 @@
         <div style="position: absolute; width:100%; top:0; line-height:40px; font-weight:900;">HP: <span id="hp-text">12000</span> / 12000</div>
     </div>
     <div id="mvp-announcement" class="q-card hidden" style="border-color: gold;">
-        <h2 style="color: gold; font-size: 40px;">🏆 戰場 MVP 🏆</h2>
-        <div id="mvp-list" style="font-size: 32px;"></div>
+        <h2 style="color: gold; font-size: 40px;">🏆 貢獻度排行榜 🏆</h2>
+        <div id="mvp-list" style="font-size: 32px; line-height: 1.5;"></div>
     </div>
     <div id="display-q-box" class="q-card hidden">
         <h2 id="d-title" style="margin-top:0; font-size: 36px; border-bottom: 2px solid #555; padding-bottom: 10px;"></h2>
         <div class="option-grid" id="d-options"></div>
     </div>
-    <div id="msg-box" style="font-size: 35px; font-weight: bold; color: #f1c40f; margin-top: 20px;"></div>
+    <div id="msg-box" style="font-size: 35px; font-weight: bold; color: #f1c40f; margin-top: 20px; height: 50px;"></div>
     <div id="vote-count" style="color: #666; font-size: 20px; margin-top: 10px;">當前集氣人數: 0</div>
 </div>
 
 <div id="admin-view" class="hidden" style="text-align: center; padding: 20px;">
     <h2>指揮官面板</h2>
     <div id="admin-btns" style="background:#222; padding:15px; border-radius:15px; margin-bottom: 20px;"></div>
-    <button onclick="calculateResult()" style="background:var(--success); color:white; width:80%; padding:25px; font-size:28px; border:none; border-radius:15px; font-weight: bold;">💥 發動全員攻擊！</button>
-    <br><button onclick="resetGame()" style="margin-top:50px; color:#444; background:none; border:none;">重置系統數據</button>
+    <button onclick="calculateResult()" style="background:var(--success); color:white; width:80%; padding:25px; font-size:28px; border:none; border-radius:15px; font-weight: bold; cursor: pointer;">💥 發動全員攻擊！</button>
+    <br><br>
+    <button onclick="resetGame()" style="background:#444; color:white; padding:10px 20px; border:none; border-radius:5px; cursor: pointer;">💣 重置系統 (強制所有人重新輸入姓名)</button>
 </div>
 
 <script>
@@ -143,8 +144,16 @@
     } else if(role === 'admin') {
         document.getElementById('admin-view').classList.remove('hidden');
         const container = document.getElementById('admin-btns');
-        for(let i=1; i<=10; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="margin:5px; padding:10px;">題${i}</button>`;
+        for(let i=1; i<=10; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="margin:5px; padding:10px; cursor:pointer;">第 ${i} 題</button>`;
     }
+
+    // 遠端強制重置監聽
+    db.ref('resetTrigger').on('value', snap => {
+        if(snap.val() === true && role === 'player') {
+            localStorage.removeItem('boss_player_name');
+            location.reload();
+        }
+    });
 
     // BGM 控制
     function toggleBGM() {
@@ -165,7 +174,7 @@
                 bossImg.src = "Boss_hurt.png";
                 bossImg.style.transform = "scale(0) rotate(720deg)";
                 confetti({ particleCount: 300, spread: 150 });
-                findMVP(); // 結算 MVP
+                findMVP(); 
             } else if(state.hp <= 6000) {
                 bossImg.src = "Boss_angry.png";
             } else {
@@ -178,6 +187,7 @@
                 document.getElementById('display-q-box').classList.remove('hidden');
                 document.getElementById('d-title').innerText = q.t;
                 document.getElementById('d-options').innerHTML = `<div>A: ${q.o.A}</div><div>B: ${q.o.B}</div><div>C: ${q.o.C}</div><div>D: ${q.o.D}</div>`;
+                document.getElementById('msg-box').innerText = "";
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
                 if(state.lastDmg > 0) {
@@ -185,7 +195,12 @@
                     const dmgText = document.getElementById('dmg-text');
                     dmgText.innerText = "-" + state.lastDmg;
                     dmgText.classList.add('dmg-float');
-                    setTimeout(() => { bossImg.classList.remove('shake'); dmgText.classList.remove('dmg-float'); }, 1000);
+                    document.getElementById('display-view').classList.add('hurt-flash');
+                    setTimeout(() => { 
+                        bossImg.classList.remove('shake'); 
+                        dmgText.classList.remove('dmg-float'); 
+                        document.getElementById('display-view').classList.remove('hurt-flash');
+                    }, 1000);
                 }
                 document.getElementById('msg-box').innerText = `攻擊成功！造成 ${state.lastDmg} 傷害！`;
             }
@@ -213,31 +228,43 @@
     // MVP 結算邏輯
     function findMVP() {
         db.ref('history').once('value', snap => {
-            const history = snap.val() || {};
-            const scores = {}; // { 名字: 答對數 }
+            const history = snap.val();
+            if(!history) return;
             
+            const scores = {}; 
             Object.values(history).forEach(round => {
                 const correctAns = questionBank[round.qNum].a;
-                Object.entries(round.players).forEach(([uid, pData]) => {
-                    if(pData.ans === correctAns || correctAns === "ALL") {
-                        scores[pData.name] = (scores[pData.name] || 0) + 1;
+                if(!round.players) return;
+                Object.values(round.players).forEach(pData => {
+                    if(pData.name) {
+                        if(!scores[pData.name]) scores[pData.name] = 0;
+                        if(correctAns === "ALL" || pData.ans === correctAns) {
+                            scores[pData.name] += 1;
+                        }
                     }
                 });
             });
 
             const sorted = Object.entries(scores).sort((a,b) => b[1] - a[1]);
+            const mvpBox = document.getElementById('mvp-announcement');
+            const mvpList = document.getElementById('mvp-list');
+            
+            mvpBox.classList.remove('hidden');
             if(sorted.length > 0) {
-                document.getElementById('mvp-announcement').classList.remove('hidden');
-                document.getElementById('mvp-list').innerHTML = sorted.slice(0,3).map((p, i) => 
-                    `第${i+1}名：${p[0]} (答對 ${p[1]} 題)`
-                ).join('<br>');
+                mvpList.innerHTML = sorted.slice(0, 5).map((p, i) => {
+                    let icon = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : "🎖️"));
+                    return `<div style="margin:10px 0;">${icon} ${p[0]} —— 擊中 ${p[1]} 次</div>`;
+                }).join('');
+            } else {
+                mvpList.innerText = "本次無人上榜...";
             }
         });
     }
 
     // 指揮官功能
     function changeQ(num) {
-        db.ref('gameState').update({ q: num, status: 'answering' });
+        db.ref('responses').remove(); // 換題時清空上一題的集氣
+        db.ref('gameState').update({ q: num, status: 'answering', lastDmg: 0 });
     }
 
     function submitAns(ans) {
@@ -247,6 +274,7 @@
         db.ref('responses/' + uid).set({ ans: ans, name: name });
         document.getElementById('player-q-zone').classList.add('hidden');
         document.getElementById('player-waiting').classList.remove('hidden');
+        document.getElementById('wait-msg').innerText = "集氣完成，等待結果...";
     }
 
     function calculateResult() {
@@ -256,11 +284,11 @@
             const qNum = data.gameState.q;
             const qData = questionBank[qNum];
             
-            // 紀錄歷史以便結算 MVP
+            // 寫入歷史
             db.ref('history').push({ qNum: qNum, players: resps });
             
             const players = Object.values(resps);
-            if(players.length === 0) return alert("沒人參與！");
+            if(players.length === 0) return alert("沒人集氣！");
             let correct = (qData.a === "ALL") ? players.length : players.filter(p => p.ans === qData.a).length;
             let dmg = Math.floor((correct / players.length) * 1500);
             
@@ -274,9 +302,15 @@
     }
 
     function resetGame() {
-        if(confirm("重置？")) {
-            db.ref('/').set({ gameState: { q:0, status:'waiting', hp:12000 } });
-            db.ref('history').remove();
+        if(confirm("確定重置？這會把所有人踢出去重新輸入姓名！")) {
+            db.ref('resetTrigger').set(true).then(() => {
+                db.ref('/').update({
+                    gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0 },
+                    responses: null,
+                    history: null
+                });
+                setTimeout(() => db.ref('resetTrigger').set(false), 1000);
+            });
         }
     }
 </script>
