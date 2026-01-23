@@ -52,7 +52,7 @@
 </head>
 <body>
 
-<audio id="game-bgm" src="bgm.mp3" loop></audio>
+<audio id="game-bgm" src="BGM.mp3" loop></audio>
 
 <div id="player-view" class="hidden">
     <div id="player-waiting" style="margin-top: 150px; text-align: center;">
@@ -128,14 +128,20 @@
     // 音樂播放控制
     function toggleBGM() {
         const bgm = document.getElementById('game-bgm');
-        if (bgm.paused) {
-            bgm.play();
-            document.getElementById('bgm-control').innerText = "⏸ 暫停 BGM";
-        } else {
-            bgm.pause();
-            document.getElementById('bgm-control').innerText = "▶ 播放 BGM";
-        }
+    const btn = document.getElementById('bgm-control');
+    
+    if (bgm.paused) {
+        bgm.play().then(() => {
+            btn.innerText = "⏸ 暫停 BGM";
+        }).catch(err => {
+            console.error("播放失敗:", err);
+            alert("播放失敗，請確認檔案名稱是否正確或檔案是否存在。");
+        });
+    } else {
+        bgm.pause();
+        btn.innerText = "▶ 播放 BGM";
     }
+}
 
     if(role === 'admin') {
         document.getElementById('admin-view').classList.remove('hidden');
@@ -246,3 +252,4 @@
 </script>
 </body>
 </html>
+
