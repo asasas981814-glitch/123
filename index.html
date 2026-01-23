@@ -189,7 +189,7 @@
                 document.getElementById('d-title').innerText = q.t;
                 document.getElementById('d-options').innerHTML = `<div>A: ${q.o.A}</div><div>B: ${q.o.B}</div><div>C: ${q.o.C}</div><div>D: ${q.o.D}</div>`;
                 document.getElementById('msg-box').innerHTML = "";
-                document.getElementById('round-num').innerText = "ATTACK!";
+                document.getElementById('round-num').innerText = "攻擊成功!";
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
                 if(state.lastDmg > 0) {
@@ -204,7 +204,7 @@
                     }, 1000);
                 }
                 document.getElementById('msg-box').innerHTML = `
-                    <div style="color: #2ecc71;">集氣成功率：${state.correctRate || 0}%</div>
+                    <div style="color: #2ecc71;">任務成功率：${state.correctRate || 0}%</div>
                     <div style="font-size: 45px; color: #e74c3c;">造成傷害：${state.lastDmg}</div>
                 `;
             } else if(state.status === 'waiting') {
@@ -306,5 +306,6 @@
 </script>
 </body>
 </html>
+
 
 
