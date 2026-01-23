@@ -27,7 +27,6 @@
         #name-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         input[type="text"] { padding: 15px; font-size: 20px; border-radius: 10px; border: none; margin-bottom: 20px; width: 80%; max-width: 300px; text-align: center; }
         .player-btn { background: linear-gradient(145deg, #f39c12, #e67e22); color: white; border: none; padding: 25px; font-size: 24px; border-radius: 20px; font-weight: bold; width: 100%; cursor: pointer; box-shadow: 0 5px #d35400; }
-        .player-btn:active { transform: translateY(2px); box-shadow: 0 2px #d35400; }
         #bgm-control { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.6); color: white; border: 1px solid #555; padding: 12px; border-radius: 10px; z-index: 1000; cursor: pointer; }
     </style>
 </head>
@@ -60,7 +59,7 @@
 
 <div id="display-view" class="hidden">
     <button id="bgm-control" onclick="toggleBGM()">🎵 啟動 BGM</button>
-    <h1 id="round-num" style="font-size: 55px; margin: 10px 0; color: var(--primary); text-shadow: 2px 2px 10px #000;">BATTLE START!</h1>
+    <h1 id="round-num" style="font-size: 55px; margin: 10px 0; color: var(--primary);">READY?</h1>
     <div id="boss-container">
         <div id="dmg-text"></div>
         <img id="boss-img" src="Boss_normal.png">
@@ -69,7 +68,7 @@
         <div id="hp-bar"></div>
         <div style="position: absolute; width:100%; top:0; line-height:45px; font-weight:900; font-size: 24px;">HP: <span id="hp-text">12000</span> / 12000</div>
     </div>
-    <div id="mvp-announcement" class="q-card hidden" style="border-color: gold; background: rgba(30, 20, 0, 0.9);">
+    <div id="mvp-announcement" class="q-card hidden" style="border-color: gold;">
         <h2 style="color: gold; font-size: 45px; margin: 10px 0;">🏆 戰場英雄榜 🏆</h2>
         <div id="mvp-list" style="font-size: 36px; line-height: 1.6;"></div>
     </div>
@@ -77,7 +76,7 @@
         <h2 id="d-title" style="margin-top:0; font-size: 40px; border-bottom: 2px solid #555; padding-bottom: 15px;"></h2>
         <div class="option-grid" id="d-options"></div>
     </div>
-    <div id="msg-box" style="font-size: 38px; font-weight: bold; color: #f1c40f; margin-top: 20px; min-height: 50px;"></div>
+    <div id="msg-box" style="font-size: 38px; font-weight: bold; color: #f1c40f; margin-top: 20px;"></div>
     <div id="vote-count" style="color: #888; font-size: 22px; margin-top: 15px;">已集結戰力: 0</div>
 </div>
 
@@ -86,7 +85,7 @@
     <div id="admin-btns" style="background:#222; padding:20px; border-radius:15px; margin-bottom: 20px;"></div>
     <button onclick="calculateResult()" style="background:var(--success); color:white; width:85%; padding:25px; font-size:32px; border:none; border-radius:15px; font-weight: bold; cursor: pointer;">💥 全員發動攻擊！</button>
     <br><br>
-    <button onclick="resetGame()" style="background:#c0392b; color:white; padding:12px 24px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場 (清除所有數據)</button>
+    <button onclick="resetGame()" style="background:#c0392b; color:white; padding:12px 24px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場 (清除名字)</button>
 </div>
 
 <script>
@@ -136,17 +135,20 @@
     } else if(role === 'admin') {
         document.getElementById('admin-view').classList.remove('hidden');
         const container = document.getElementById('admin-btns');
-        for(let i=1; i<=10; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="margin:5px; padding:12px; cursor:pointer; font-weight:bold;">第 ${i} 題</button>`;
+        for(let i=1; i<=10; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="margin:5px; padding:12px; cursor:pointer;">第 ${i} 題</button>`;
     }
 
+    // 修正後的重置監聽邏輯
     db.ref('resetTrigger').on('value', snap => {
         if(snap.val() === true && role === 'player') {
-            localStorage.removeItem('boss_player_name');
-            location.reload();
+            // 只有在還沒清除名字的情況下才執行，避免循環
+            if(localStorage.getItem('boss_player_name')) {
+                localStorage.removeItem('boss_player_name');
+                location.reload();
+            }
         }
     });
 
-    // 音樂控制核心
     function toggleBGM() {
         const bgm = document.getElementById('game-bgm');
         const vbgm = document.getElementById('victory-bgm');
@@ -154,39 +156,26 @@
             bgm.play();
             document.getElementById('bgm-control').innerText = "⏸ 暫停音效";
         } else {
-            bgm.pause();
-            vbgm.pause();
+            bgm.pause(); vbgm.pause();
             document.getElementById('bgm-control').innerText = "▶ 播放音效";
         }
     }
 
-    // 監聽遊戲狀態
     db.ref('gameState').on('value', snap => {
         const state = snap.val() || { hp: 12000, status: 'waiting' };
         if(role === 'display') {
             const bossImg = document.getElementById('boss-img');
             const bgm = document.getElementById('game-bgm');
             const vbgm = document.getElementById('victory-bgm');
-            
             document.getElementById('hp-bar').style.width = (state.hp/12000*100) + "%";
             document.getElementById('hp-text').innerText = state.hp;
-            
             if(state.hp <= 0) {
-                bossImg.src = "Boss_hurt.png";
-                bossImg.style.transform = "scale(0) rotate(720deg)";
-                confetti({ particleCount: 350, spread: 180, origin: { y: 0.6 } });
-                
-                // 音樂切換為勝利曲
-                bgm.pause();
-                if(vbgm.paused) vbgm.play().catch(e => console.log("勝利音效待觸發"));
-                
-                findMVP(); 
-                document.getElementById('round-num').innerText = "VICTORY!";
-            } else if(state.hp <= 6000) {
-                bossImg.src = "Boss_angry.png";
-            } else {
-                bossImg.src = "Boss_normal.png";
-            }
+                bossImg.src = "Boss_hurt.png"; bossImg.style.transform = "scale(0) rotate(720deg)";
+                confetti({ particleCount: 300, spread: 160 });
+                bgm.pause(); if(vbgm.paused) vbgm.play().catch(e => {});
+                findMVP(); document.getElementById('round-num').innerText = "VICTORY!";
+            } else if(state.hp <= 6000) { bossImg.src = "Boss_angry.png"; }
+            else { bossImg.src = "Boss_normal.png"; }
 
             if(state.status === 'answering') {
                 const q = questionBank[state.q];
@@ -194,7 +183,7 @@
                 document.getElementById('display-q-box').classList.remove('hidden');
                 document.getElementById('d-title').innerText = q.t;
                 document.getElementById('d-options').innerHTML = `<div>A: ${q.o.A}</div><div>B: ${q.o.B}</div><div>C: ${q.o.C}</div><div>D: ${q.o.D}</div>`;
-                document.getElementById('round-num').innerText = `PHASE ${state.q}`;
+                document.getElementById('msg-box').innerText = "";
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
                 if(state.lastDmg > 0) {
@@ -204,15 +193,13 @@
                     dmgText.classList.add('dmg-float');
                     document.getElementById('display-view').classList.add('hurt-flash');
                     setTimeout(() => { 
-                        bossImg.classList.remove('shake'); 
-                        dmgText.classList.remove('dmg-float'); 
+                        bossImg.classList.remove('shake'); dmgText.classList.remove('dmg-float'); 
                         document.getElementById('display-view').classList.remove('hurt-flash');
                     }, 1000);
                 }
-                document.getElementById('msg-box').innerText = `命中！造成 ${state.lastDmg} 傷害！`;
+                document.getElementById('msg-box').innerText = `造成 ${state.lastDmg} 傷害！`;
             }
         }
-        
         if(role === 'player') {
             const q = questionBank[state.q];
             if(state.status === 'answering') {
@@ -224,7 +211,6 @@
             } else {
                 document.getElementById('player-q-zone').classList.add('hidden');
                 document.getElementById('player-waiting').classList.remove('hidden');
-                document.getElementById('wait-msg').innerText = state.status === 'result' ? "攻擊結算中..." : "等待指揮官指令...";
             }
         }
     });
@@ -235,8 +221,7 @@
 
     function findMVP() {
         db.ref('history').once('value', snap => {
-            const history = snap.val();
-            if(!history) return;
+            const history = snap.val(); if(!history) return;
             const scores = {}; 
             Object.values(history).forEach(round => {
                 const correctAns = questionBank[round.qNum].a;
@@ -255,7 +240,7 @@
             if(sorted.length > 0) {
                 mvpList.innerHTML = sorted.slice(0, 5).map((p, i) => {
                     let icon = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : "🎖️"));
-                    return `<div style="margin:12px 0;">${icon} <span style="color:white">${p[0]}</span> —— 擊中 ${p[1]} 次</div>`;
+                    return `<div style="margin:12px 0;">${icon} <span style="color:white">${p[0]}</span> —— ${p[1]} 次</div>`;
                 }).join('');
             }
         });
@@ -284,7 +269,7 @@
             const qData = questionBank[qNum];
             db.ref('history').push({ qNum: qNum, players: resps });
             const players = Object.values(resps);
-            if(players.length === 0) return alert("還沒有人集氣！");
+            if(players.length === 0) return alert("還沒人集氣！");
             let correct = (qData.a === "ALL") ? players.length : players.filter(p => p.ans === qData.a).length;
             let dmg = Math.floor((correct / players.length) * 1500);
             db.ref('gameState').update({ status: 'result', hp: Math.max(0, data.gameState.hp - dmg), lastDmg: dmg });
@@ -293,15 +278,16 @@
     }
 
     function resetGame() {
-        if(confirm("重置戰場？這會將所有玩家踢出並要求重新簽名。")) {
+        if(confirm("確定重置？這會清空數據並要求所有人重新輸入名字。")) {
+            // 先設為 true
             db.ref('resetTrigger').set(true).then(() => {
                 db.ref('/').update({
                     gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0 },
                     responses: null,
                     history: null
                 });
-                setTimeout(() => db.ref('resetTrigger').set(false), 1000);
-                location.reload(); 
+                // 很快地設回 false，讓重新整理後的頁面不會再抓到 true
+                setTimeout(() => db.ref('resetTrigger').set(false), 500);
             });
         }
     }
