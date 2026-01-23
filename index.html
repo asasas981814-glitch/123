@@ -3,45 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CA 部門大作戰 - Beat the Boss</title>
+    <title>CA 部門大作戰 - BOSS BATTLE</title>
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <style>
-        :root { --primary: #f39c12; --secondary: #2c3e50; --danger: #e74c3c; --success: #27ae60; }
-        body { background: #1a1a1a; color: white; font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; margin: 0; text-align: center; }
+        :root { --primary: #f39c12; --danger: #e74c3c; --success: #27ae60; }
+        body { background: #121212; color: white; font-family: "PingFang TC", sans-serif; margin: 0; overflow-x: hidden; }
         .hidden { display: none !important; }
         
-        /* 大螢幕樣式 */
-        #display-view { padding: 20px; }
-        .q-card { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 15px; margin: 20px auto; max-width: 800px; border: 2px solid var(--primary); }
-        .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; font-size: 24px; }
-        #boss-img { width: 180px; margin: 20px; transition: transform 0.1s; }
-        .shake { animation: shake 0.5s; }
-        @keyframes shake { 0%, 100% {transform:translateX(0)} 25% {transform:translateX(-10px)} 75% {transform:translateX(10px)} }
-        #hp-wrapper { width: 80%; background: #333; height: 40px; border: 3px solid white; margin: 10px auto; border-radius: 20px; overflow: hidden; position: relative; }
-        #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff4b2b, #ff416c); transition: width 0.8s ease-out; }
+        /* 大螢幕特效 */
+        #display-view { padding: 20px; transition: background 0.3s; }
+        .hurt-flash { background: rgba(231, 76, 60, 0.3) !important; } /* 受傷閃紅 */
         
-        /* 玩家樣式 */
-        .player-btn { background: var(--primary); color: white; border: none; padding: 25px; font-size: 20px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; }
-        .player-btn:active { transform: scale(0.95); background: #d35400; }
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; }
+        .q-card { background: rgba(0,0,0,0.6); padding: 20px; border-radius: 15px; margin: 20px auto; max-width: 800px; border: 2px solid var(--primary); box-shadow: 0 0 20px var(--primary); }
+        .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; font-size: 24px; }
+        
+        /* Boss 容器與動畫 */
+        #boss-container { position: relative; display: inline-block; margin: 20px; }
+        #boss-img { width: 250px; transition: all 0.5s; filter: drop-shadow(0 0 10px rgba(255,255,255,0.2)); }
+        .shake { animation: heavy-shake 0.5s both; }
+        @keyframes heavy-shake {
+            0%, 100% {transform: translateX(0);}
+            20% {transform: translateX(-15px) rotate(-5deg);}
+            40% {transform: translateX(15px) rotate(5deg);}
+            60% {transform: translateX(-15px) rotate(-5deg);}
+            80% {transform: translateX(15px) rotate(5deg);}
+        }
+        
+        /* 傷害數字彈出 */
+        #dmg-text { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 60px; font-weight: bold; color: #ff4b2b; text-shadow: 2px 2px 10px black; opacity: 0; pointer-events: none; }
+        .dmg-float { animation: float-up 1.2s ease-out; }
+        @keyframes float-up {
+            0% { opacity: 1; transform: translate(-50%, 0); }
+            100% { opacity: 0; transform: translate(-50%, -100px); }
+        }
 
-        /* 管理員樣式 */
-        .admin-box { background: #333; padding: 15px; margin: 10px; border-radius: 10px; }
-        button.admin-op { background: #555; color: white; border: 1px solid #888; padding: 10px; margin: 5px; cursor: pointer; }
-        button.admin-op:hover { background: #777; }
+        #hp-wrapper { width: 80%; background: #333; height: 35px; border: 3px solid white; margin: 10px auto; border-radius: 20px; overflow: hidden; box-shadow: 0 0 15px rgba(255,0,0,0.5); }
+        #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff416c, #ff4b2b); transition: width 1s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+        
+        /* 玩家按鈕 */
+        .player-btn { background: linear-gradient(145deg, #f39c12, #e67e22); color: white; border: none; padding: 25px; font-size: 22px; border-radius: 15px; font-weight: bold; cursor: pointer; box-shadow: 0 5px #d35400; }
+        .player-btn:active { box-shadow: 0 2px #d35400; transform: translateY(3px); }
     </style>
 </head>
 <body>
 
 <div id="player-view" class="hidden">
-    <div id="player-waiting" style="margin-top: 100px;">
-        <h2>準備好了嗎？</h2>
-        <p>請等待主持人發布題目...</p>
+    <div id="player-waiting" style="margin-top: 150px;">
+        <h2>⚡ 準備集氣 ⚡</h2>
+        <p id="wait-msg">等待主持人發布題目...</p>
     </div>
     <div id="player-q-zone" class="hidden">
-        <h3 id="p-title" style="padding: 15px;">題目載入中...</h3>
-        <div class="btn-grid">
+        <h3 id="p-title">題目載入中...</h3>
+        <div class="btn-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px;">
             <button class="player-btn" onclick="submitAns('A')">A. <span id="pa"></span></button>
             <button class="player-btn" onclick="submitAns('B')">B. <span id="pb"></span></button>
             <button class="player-btn" onclick="submitAns('C')">C. <span id="pc"></span></button>
@@ -51,33 +66,33 @@
 </div>
 
 <div id="display-view" class="hidden">
-    <h1 id="round-num" style="color: var(--primary);">READY?</h1>
-    <div id="boss-area">
-        <img id="boss-img" src="https://cdn-icons-png.flaticon.com/512/1423/1423783.png">
-        <div id="hp-wrapper"><div id="hp-bar"></div></div>
-        <div id="hp-info" style="font-weight: bold; font-size: 24px;">HP: 12000 / 12000</div>
+    <h1 id="round-num" style="font-size: 40px; margin-bottom: 0;">READY?</h1>
+    <div id="boss-container">
+        <div id="dmg-text"></div>
+        <img id="boss-img" src="你的預設Boss圖片網址">
     </div>
+    <div id="hp-wrapper"><div id="hp-bar"></div></div>
+    <div id="hp-info" style="font-weight: bold; font-size: 28px;">HP: 12000 / 12000</div>
     
     <div id="display-q-box" class="q-card hidden">
-        <h2 id="d-title"></h2>
+        <h2 id="d-title" style="margin-top:0;"></h2>
         <div class="option-grid" id="d-options"></div>
     </div>
-    
-    <div id="msg-box" style="font-size: 32px; color: #f1c40f; margin-top: 20px; min-height: 40px;"></div>
-    <div id="vote-count" style="margin-top: 10px; color: #888;">已加入人數: 0</div>
+    <div id="msg-box" style="font-size: 32px; color: #f1c40f; margin-top: 10px; height: 50px;"></div>
+    <div id="vote-count" style="color: #888;">已加入人數: 0</div>
 </div>
 
 <div id="admin-view" class="hidden">
     <h2>指揮官後台</h2>
-    <div class="admin-box" id="admin-btns"></div>
-    <div class="admin-box">
-        <button onclick="calculateResult()" style="background: var(--success); width: 100%; padding: 15px; font-size: 18px; color: white; border: none; border-radius: 5px;">💥 結算本題並攻擊</button>
-        <button onclick="resetGame()" style="margin-top: 20px; background: var(--danger); color: white; border: none; padding: 5px; cursor: pointer;">♻️ 重置全場</button>
+    <div style="background:#333; padding:10px; margin:10px; border-radius:10px;" id="admin-btns"></div>
+    <div style="padding:20px;">
+        <button onclick="calculateResult()" style="background:var(--success); color:white; width:100%; padding:20px; font-size:24px; border:none; border-radius:10px; cursor:pointer;">💥 發動攻擊！</button>
+        <button onclick="resetGame()" style="margin-top:30px; background:#555; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer;">重置遊戲</button>
     </div>
 </div>
 
 <script>
-    // --- STEP 1: 配置 ---
+    // --- 配置 ---
     const firebaseConfig = {
         apiKey: "AIzaSyDwwKME2_neH-VxZObTStJ_uRuJI_-C-tw",
         authDomain: "department-boss-battle.firebaseapp.com",
@@ -88,7 +103,6 @@
         appId: "1:112990000902:web:5b003355322134537e3087"
     };
 
-    // --- STEP 2: 題目數據 ---
     const questionBank = {
         1: { t: "請問主持人帥嗎?", o: {A:"帥", B:"很帥", C:"超帥", D:"特別帥"}, a: "ALL" },
         2: { t: "Moxa在哪裡?", o: {A:"板橋", B:"新莊", C:"中和", D:"永和"}, a: "B" },
@@ -102,48 +116,62 @@
         10: { t: "CA小猴是誰?", o: {A:"Tiffiya", B:"Tiffant", C:"Tiffjia", D:"Tiffany"}, a: "D" }
     };
 
-    // --- 初始化 ---
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const urlParams = new URLSearchParams(window.location.search);
-    const role = urlParams.get('role') || 'player'; 
+    const role = new URLSearchParams(window.location.search).get('role') || 'player';
 
-    // 介面切換
     if(role === 'admin') {
         document.getElementById('admin-view').classList.remove('hidden');
-        const btnContainer = document.getElementById('admin-btns');
-        btnContainer.innerHTML = ''; 
-        for(let i=1; i<=10; i++) {
-            btnContainer.innerHTML += `<button class="admin-op" onclick="changeQ(${i})">發布第 ${i} 題</button>`;
-        }
+        const container = document.getElementById('admin-btns');
+        for(let i=1; i<=10; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="margin:5px; padding:10px;">題${i}</button>`;
     } else if(role === 'display') {
         document.getElementById('display-view').classList.remove('hidden');
     } else {
         document.getElementById('player-view').classList.remove('hidden');
     }
 
-    // --- 即時監聽 ---
+    // --- 即時監聽與特效 ---
     db.ref('gameState').on('value', (snap) => {
         const state = snap.val() || { q: 0, status: 'waiting', hp: 12000 };
         const qData = questionBank[state.q];
 
         if(role === 'display') {
-            document.getElementById('hp-bar').style.width = (state.hp / 12000 * 100) + "%";
-            document.getElementById('hp-info').innerText = `HP: ${state.hp} / 12000`;
+            const hpBar = document.getElementById('hp-bar');
+            const hpInfo = document.getElementById('hp-info');
+            const bossImg = document.getElementById('boss-img');
+            
+            hpBar.style.width = (state.hp / 12000 * 100) + "%";
+            hpInfo.innerText = `HP: ${state.hp} / 12000`;
+
+            // Boss 狀態與圖片切換 (範例：血量低於 50% 變紅)
+            if(state.hp <= 6000) bossImg.style.filter = "sepia(1) saturate(3) hue-rotate(-50deg)";
+            if(state.hp <= 0) {
+                bossImg.style.transform = "scale(0) rotate(720deg)";
+                confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 } });
+            }
+
             if(state.status === 'answering' && qData) {
-                document.getElementById('round-num').innerText = `第 ${state.q} 題`;
+                document.getElementById('round-num').innerText = `ROUND ${state.q}`;
                 document.getElementById('display-q-box').classList.remove('hidden');
                 document.getElementById('d-title').innerText = qData.t;
                 document.getElementById('d-options').innerHTML = `<div>A: ${qData.o.A}</div><div>B: ${qData.o.B}</div><div>C: ${qData.o.C}</div><div>D: ${qData.o.D}</div>`;
-                document.getElementById('msg-box').innerText = "";
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
-                document.getElementById('msg-box').innerText = state.lastDmg > 0 ? `💥 造成 ${state.lastDmg} 點傷害！(答對率 ${state.lastRate}%)` : "";
                 if(state.lastDmg > 0) {
-                    const img = document.getElementById('boss-img');
-                    img.classList.add('shake');
-                    setTimeout(() => img.classList.remove('shake'), 500);
+                    // 觸發震動與數字彈出
+                    bossImg.classList.add('shake');
+                    const dmgText = document.getElementById('dmg-text');
+                    dmgText.innerText = `-${state.lastDmg}`;
+                    dmgText.classList.add('dmg-float');
+                    document.getElementById('display-view').classList.add('hurt-flash');
+                    
+                    setTimeout(() => {
+                        bossImg.classList.remove('shake');
+                        dmgText.classList.remove('dmg-float');
+                        document.getElementById('display-view').classList.remove('hurt-flash');
+                    }, 1000);
                 }
+                document.getElementById('msg-box').innerText = `答對率 ${state.lastRate}%！ 造成 ${state.lastDmg} 傷害！`;
             }
         }
 
@@ -154,22 +182,21 @@
                 waiting.classList.add('hidden');
                 zone.classList.remove('hidden');
                 document.getElementById('p-title').innerText = qData.t;
-                document.getElementById('pa').innerText = qData.o.A; 
-                document.getElementById('pb').innerText = qData.o.B;
-                document.getElementById('pc').innerText = qData.o.C; 
-                document.getElementById('pd').innerText = qData.o.D;
+                document.getElementById('pa').innerText = qData.o.A; document.getElementById('pb').innerText = qData.o.B;
+                document.getElementById('pc').innerText = qData.o.C; document.getElementById('pd').innerText = qData.o.D;
             } else {
                 waiting.classList.remove('hidden');
                 zone.classList.add('hidden');
+                if(state.status === 'result') document.getElementById('wait-msg').innerText = "結算中...請看大螢幕！";
             }
         }
     });
 
     db.ref('responses').on('value', snap => {
-        if(role === 'display') document.getElementById('vote-count').innerText = `已加入人數: ${snap.numChildren()}`;
+        if(role === 'display') document.getElementById('vote-count').innerText = `已投票人數: ${snap.numChildren()}`;
     });
 
-    // --- 功能函式 ---
+    // --- 功能 ---
     function changeQ(q) {
         db.ref('responses').remove();
         db.ref('gameState').update({ q: q, status: 'answering', lastDmg: 0 });
@@ -180,33 +207,28 @@
         localStorage.setItem('game_uid', uid);
         db.ref('responses/' + uid).set(ans);
         document.getElementById('player-q-zone').classList.add('hidden');
-        document.getElementById('player-waiting').innerHTML = "<h2>已送出答案！</h2><p>請等待大螢幕結算...</p>";
         document.getElementById('player-waiting').classList.remove('hidden');
+        document.getElementById('wait-msg').innerText = "已成功集氣！等待攻擊...";
     }
 
     function calculateResult() {
         db.ref().once('value', snap => {
             const data = snap.val();
-            if(!data.gameState || data.gameState.status !== 'answering') return alert("請先發布題目！");
-            
             const qData = questionBank[data.gameState.q];
             const resps = Object.values(data.responses || {});
-            if(resps.length === 0) return alert("還沒有人投票！");
+            if(resps.length === 0) return alert("沒人投票！");
 
-            let correctCount = 0;
-            if(qData.a === "ALL") {
-                correctCount = resps.length;
-            } else {
-                correctCount = resps.filter(a => a === qData.a).length;
-            }
-
-            const rate = (correctCount / resps.length) * 100;
-            let dmg = 0;
-            if(rate <= 20) dmg = 100;
-            else if(rate <= 40) dmg = 300;
-            else if(rate <= 60) dmg = 600;
-            else if(rate <= 80) dmg = 1000;
-            else dmg = 1500;
+            let correct = (qData.a === "ALL") ? resps.length : resps.filter(a => a === qData.a).length;
+            const rate = (correct / resps.length) * 100;
+            
+            let dmg = 100;
+            if(rate > 20) dmg = 300;
+            if(rate > 40) dmg = 600;
+            if(rate > 60) dmg = 1000;
+            if(rate > 80) dmg = 1500;
+            
+            // 隨機爆擊 10% 機率
+            if(Math.random() < 0.1) { dmg *= 2; }
 
             db.ref('gameState').update({
                 status: 'result',
@@ -218,14 +240,8 @@
     }
 
     function resetGame() {
-        if(confirm("確定要徹底重置遊戲與血量嗎？")) {
-            db.ref('/').set({ 
-                gameState: { q: 0, status: 'waiting', hp: 12000, lastDmg: 0 } 
-            });
-            location.reload();
-        }
+        if(confirm("確定重置？")) db.ref('/').set({ gameState: { q:0, status:'waiting', hp:12000, lastDmg:0 } });
     }
 </script>
 </body>
 </html>
-
