@@ -37,14 +37,14 @@
 
 <div id="name-overlay" class="hidden">
     <h2 style="color: var(--primary); font-size: 30px;">🛡️ 戰士加入戰場 🛡️</h2>
-    <input type="text" id="player-name-input" placeholder="請輸入您的暱稱...">
-    <button class="player-btn" style="width: 200px;" onclick="saveName()">開始戰鬥</button>
+    <input type="text" id="player-name-input" placeholder="請輸入您的名字...">
+    <button class="player-btn" style="width: 200px;" onclick="saveName()">加入戰鬥</button>
 </div>
 
 <div id="player-view" class="hidden">
     <div id="player-waiting" style="margin-top: 150px; text-align: center;">
         <h2 id="welcome-msg" style="font-size: 32px;">準備中...</h2>
-        <p id="wait-msg" style="font-size: 22px; color: #f1c40f;">等待 Boss 出現...</p>
+        <p id="wait-msg" style="font-size: 22px; color: #f1c40f;">等待指揮官發布任務...</p>
     </div>
     <div id="player-q-zone" class="hidden">
         <h3 id="p-title" style="text-align: center; font-size: 28px; padding: 15px; min-height: 80px;">題目載入中...</h3>
@@ -100,7 +100,7 @@
     };
 
     const questionBank = {
-        1: { t: "請問主持人帥嗎?", o: {A:"帥", B:"很帥", C:"超帥", D:"特別帥"}, a: "ALL" },
+        1: { t: "請問今天的主持人帥嗎?", o: {A:"帥", B:"很帥", C:"超帥", D:"特別帥"}, a: "ALL" },
         2: { t: "Moxa在哪裡?", o: {A:"板橋", B:"新莊", C:"中和", D:"永和"}, a: "B" },
         3: { t: "我們是甚麼股份有限公司?", o: {A:"101", B:"202", C:"303", D:"404"}, a: "D" },
         4: { t: "CE全稱?", o: {A:"Common Era", B:"Civil Engineer", C:"Component Engineer", D:"Computer Engineer"}, a: "C" },
@@ -306,4 +306,5 @@
 </script>
 </body>
 </html>
+
 
