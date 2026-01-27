@@ -64,9 +64,14 @@
 <audio id="victory-bgm" src="BGM_Victory.mp3"></audio>
 
 <div id="name-overlay" class="hidden">
-    <h2 style="color: var(--primary); font-size: 30px;">🛡️ 戰士加入戰場 🛡️</h2>
-    <input type="text" id="player-name-input" placeholder="請輸入您的名字...">
-    <button class="player-btn" style="width: 200px;" onclick="saveName()">加入戰鬥</button>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 20px; width: 85%;">
+        <h2 style="color: var(--primary); font-size: 32px; margin-bottom: 10px; text-shadow: 0 0 10px rgba(243,156,18,0.3);">🛡️ 戰士加入戰場 🛡️</h2>
+        
+        <input type="text" id="player-name-input" placeholder="請輸入您的名字..." 
+               style="width: 100%; max-width: 300px; padding: 18px; font-size: 20px; border-radius: 15px; border: 2px solid var(--primary); background: #222; color: white; outline: none; text-align: center;">
+        
+        <button class="player-btn" style="width: 100%; max-width: 300px; padding: 20px; font-size: 24px;" onclick="saveName()">加入戰鬥</button>
+    </div>
 </div>
 
 <div id="player-view" class="hidden">
@@ -428,3 +433,4 @@
 </script>
 </body>
 </html>
+
