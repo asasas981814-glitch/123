@@ -131,16 +131,12 @@
     const uid = localStorage.getItem('game_uid') || Math.random().toString(36).substring(7);
     localStorage.setItem('game_uid', uid);
 
-    // --- 修正版重置邏輯 ---
     let isResetting = false;
     db.ref('resetTrigger').on('value', snap => {
         if (snap.val() === true && !isResetting) {
             isResetting = true;
-            // 如果是玩家，清除本地姓名紀錄
             if(role === 'player') localStorage.removeItem('boss_player_name');
-            setTimeout(() => {
-                location.reload();
-            }, 100);
+            setTimeout(() => { location.reload(); }, 100);
         }
     });
 
@@ -173,8 +169,21 @@
         else { bgm.pause(); vbgm.pause(); document.getElementById('bgm-control').innerText = "▶ 播放音效"; }
     }
 
+    // 核心新增：記錄 User 是否已在當前題目提交答案
+    let hasSubmitted = false;
+    let lastQNum = -1;
+
     db.ref('gameState').on('value', snap => {
         const state = snap.val() || { hp: 12000, status: 'waiting' };
+        
+        // 如果題目編號改變，或是進入 answering 狀態，重置提交狀態
+        if (state.q !== lastQNum || state.status === 'answering') {
+            if (state.status === 'answering' && state.q !== lastQNum) {
+                hasSubmitted = false;
+            }
+            lastQNum = state.q;
+        }
+
         if(state.timeLeft !== undefined && state.status === 'answering') {
             const timerStr = state.timeLeft > 0 ? `⏳ ${state.timeLeft}s` : "⌛ 時間到！";
             if(role === 'display') document.getElementById('d-timer').innerText = timerStr;
@@ -246,9 +255,11 @@
                 document.getElementById('round-num').innerText = "攻擊成功!";
             }
         }
+
         if(role === 'player') {
             const q = questionBank[state.q];
-            if(state.status === 'answering') {
+            // 關鍵判斷：只有在 answering 狀態，且還沒提交答案過，且時間還在，才顯示答題區
+            if(state.status === 'answering' && !hasSubmitted) {
                 document.getElementById('player-waiting').classList.add('hidden');
                 document.getElementById('player-q-zone').classList.remove('hidden');
                 document.getElementById('p-title').innerText = q.t;
@@ -256,9 +267,17 @@
                 document.getElementById('pc').innerText = q.o.C; document.getElementById('pd').innerText = q.o.D;
                 if(state.timeLeft > 0) document.querySelectorAll('.q-btn').forEach(b => b.disabled = false);
             } else {
+                // 如果已經提交、時間到、或是處於結算中，通通顯示等待畫面
                 document.getElementById('player-q-zone').classList.add('hidden');
                 document.getElementById('player-waiting').classList.remove('hidden');
-                document.getElementById('wait-msg').innerText = state.status === 'result' ? "任務結算中..." : "等待指揮官發布任務...";
+                
+                if (hasSubmitted) {
+                    document.getElementById('wait-msg').innerText = "集氣完成，準備攻擊！💥";
+                } else if (state.status === 'result') {
+                    document.getElementById('wait-msg').innerText = "任務結算中...";
+                } else {
+                    document.getElementById('wait-msg').innerText = "等待指揮官發布任務...";
+                }
             }
         }
     });
@@ -281,6 +300,7 @@
     }
 
     function submitAns(ans) {
+        hasSubmitted = true; // 本地鎖定
         db.ref('responses/' + uid).set({ ans: ans, name: localStorage.getItem('boss_player_name') });
         document.getElementById('player-q-zone').classList.add('hidden');
         document.getElementById('player-waiting').classList.remove('hidden');
@@ -303,7 +323,7 @@
             let rate = Math.round((correctCount / players.length) * 100);
             let dmg = Math.floor((rate / 100) * 1500);
             db.ref('gameState').update({ status: 'result', hp: Math.max(0, data.gameState.hp - dmg), lastDmg: dmg, correctRate: rate, stats: stats, timeLeft: 0 });
-            db.ref('responses').remove();
+            // 注意：這裡不移除 responses，留到 changeQ 再移除
         });
     }
 
@@ -337,16 +357,10 @@
     function resetGame() {
         if(confirm("確定重置？這會讓所有端點重新整理。")) {
             clearInterval(timerInterval);
-            // 核心修正：先設為 true 觸發所有人，隨後立即清空資料
             db.ref('resetTrigger').set(true).then(() => {
-                console.log("重置訊號已送出");
-                // 這裡的 update 會順便把 resetTrigger 設回 false
                 db.ref('/').update({
                     gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0, stats: null, timeLeft: 10 },
-                    responses: null,
-                    history: null,
-                    players: null,
-                    resetTrigger: false
+                    responses: null, history: null, players: null, resetTrigger: false
                 });
             });
         }
