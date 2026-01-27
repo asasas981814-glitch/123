@@ -371,17 +371,29 @@
         });
     }
 
-    function resetGame() {
-        if(confirm("確定重置？這會讓所有端點重新整理。")) {
-            clearInterval(timerInterval);
-            db.ref('resetTrigger').set(true).then(() => {
-                db.ref('/').update({
-                    gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0, stats: null, timeLeft: 10 },
-                    responses: null, history: null, players: null, resetTrigger: false
-                });
-            });
-        }
+   function resetGame() {
+    if(confirm("⚠ 注意：這將會清除所有玩家記錄、分數與血量，並重新整理所有人的網頁。確定嗎？")) {
+        clearInterval(timerInterval);
+        
+        // 直接對根目錄進行一次性的大更新
+        db.ref('/').update({
+            gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0, stats: null, timeLeft: 10 },
+            responses: null,
+            history: null,
+            players: null,
+            resetTrigger: true  // 觸發全體重新整理
+        }).then(() => {
+            console.log("資料重置成功");
+            // 延遲一秒後將 trigger 設回 false，避免無限循環重新整理
+            setTimeout(() => {
+                db.ref('resetTrigger').set(false);
+            }, 1000);
+        }).catch(err => {
+            alert("重置失敗，請檢查 Firebase 權限設定！\n錯誤訊息：" + err.message);
+        });
     }
+}
 </script>
 </body>
 </html>
+
