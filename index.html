@@ -3,39 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QMD 團結一心 Boss 大挑戰</title>
+    <title>QMD 團結一心 Boss 大挑戰 - 終極戰場版</title>
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <style>
         :root { --primary: #f39c12; --danger: #e74c3c; --success: #27ae60; --disabled: #555; }
-        body { background: #121212; color: white; font-family: "PingFang TC", sans-serif; margin: 0; overflow-x: hidden; }
+        body { background: #121212; color: white; font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; margin: 0; overflow-x: hidden; }
         .hidden { display: none !important; }
-        #display-view { padding: 20px; text-align: center; }
-        .hurt-flash { background: rgba(231, 76, 60, 0.4) !important; transition: 0.1s; }
-        .q-card { background: rgba(0,0,0,0.85); padding: 30px; border-radius: 20px; margin: 20px auto; max-width: 900px; border: 3px solid var(--primary); box-shadow: 0 0 30px rgba(243, 156, 18, 0.5); }
-        .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; font-size: 28px; text-align: left; }
+        
+        /* 視圖樣式 */
+        #display-view { padding: 20px; text-align: center; transition: background 0.2s; }
+        .hurt-flash { background: rgba(231, 76, 60, 0.5) !important; }
+        
+        /* Boss 容器與特效 */
         #boss-container { position: relative; display: inline-block; margin: 40px auto; min-height: 320px; }
-        #boss-img { width: 320px; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); filter: drop-shadow(0 0 15px rgba(255,255,255,0.3)); }
+        #boss-img { width: 320px; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); filter: drop-shadow(0 0 20px rgba(255,255,255,0.2)); }
+        
+        /* 動畫庫 */
         .shake { animation: heavy-shake 0.5s both; }
-        @keyframes heavy-shake { 0%, 100% {transform: translateX(0);} 20% {transform: translateX(-20px) rotate(-8deg);} 40% {transform: translateX(20px) rotate(8deg);} 60% {transform: translateX(-20px) rotate(-8deg);} 80% {transform: translateX(20px) rotate(8deg);} }
-        #hp-wrapper { width: 85%; background: #222; height: 45px; border: 4px solid #fff; margin: 20px auto; border-radius: 25px; overflow: hidden; position: relative; }
-        #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff416c, #ff4b2b); transition: width 1.2s ease-out; }
-        #dmg-text { position: absolute; top: -30px; left: 50%; transform: translateX(-50%); font-size: 80px; font-weight: 900; color: #ff3e3e; opacity: 0; pointer-events: none; z-index: 100; text-shadow: 4px 4px 0 #000; }
+        @keyframes heavy-shake { 0%, 100% {transform: translateX(0);} 20% {transform: translateX(-15px) rotate(-5deg);} 40% {transform: translateX(15px) rotate(5deg);} 60% {transform: translateX(-15px) rotate(-5deg);} 80% {transform: translateX(15px) rotate(5deg);} }
+        
+        .screen-shake { animation: screen-shake-anim 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes screen-shake-anim { 10%, 90% { transform: translate3d(-4px, 0, 0); } 20%, 80% { transform: translate3d(6px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-10px, 0, 0); } 40%, 60% { transform: translate3d(10px, 0, 0); } }
+
+        .boss-spawn { animation: spawn-glow 0.8s ease-out; }
+        @keyframes spawn-glow { 0% { filter: brightness(5); transform: scale(0.3); opacity: 0; } 100% { filter: brightness(1); transform: scale(1); opacity: 1; } }
+
+        /* 血條與傷害數字 */
+        #hp-wrapper { width: 85%; background: #222; height: 45px; border: 4px solid #fff; margin: 20px auto; border-radius: 25px; overflow: hidden; position: relative; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
+        #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff416c, #ff4b2b); transition: width 1s ease-out; }
+        .hp-low { animation: hp-pulse 1s infinite; }
+        @keyframes hp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        #dmg-text { position: absolute; top: -40px; left: 50%; transform: translateX(-50%); font-size: 80px; font-weight: 900; color: #ff3e3e; opacity: 0; pointer-events: none; z-index: 100; text-shadow: 4px 4px 0 #000, 0 0 20px #fff; -webkit-text-stroke: 2px white; }
         .dmg-float { animation: float-up 1.2s forwards; }
-        @keyframes float-up { 0% { opacity: 1; transform: translate(-50%, 0) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -120px) scale(1.2); } }
+        @keyframes float-up { 0% { opacity: 1; transform: translate(-50%, 0) scale(0.8); } 50% { transform: translate(-50%, -60px) scale(1.3); } 100% { opacity: 0; transform: translate(-50%, -120px) scale(1); } }
+
+        /* 卡片與統計 */
+        .q-card { background: rgba(0,0,0,0.9); padding: 30px; border-radius: 20px; margin: 20px auto; max-width: 900px; border: 3px solid var(--primary); box-shadow: 0 0 30px rgba(243, 156, 18, 0.4); }
+        .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; font-size: 28px; text-align: left; }
         .stat-container { display: flex; flex-direction: column; align-items: center; margin-top: 20px; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; }
         .stat-row { display: flex; align-items: center; width: 100%; max-width: 750px; margin: 8px 0; font-size: 22px; }
-        .stat-label { width: 180px; font-weight: bold; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .stat-label { width: 200px; font-weight: bold; text-align: left; }
         .stat-bar-bg { flex-grow: 1; background: #333; height: 24px; border-radius: 12px; margin: 0 15px; overflow: hidden; }
         .stat-bar-fill { height: 100%; background: #777; transition: width 1s ease-out; }
         .correct-fill { background: var(--success) !important; box-shadow: 0 0 15px var(--success); }
-        .stat-value { width: 150px; text-align: right; font-size: 20px; color: #aaa; }
-        #name-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        input[type="text"] { padding: 15px; font-size: 20px; border-radius: 10px; border: none; margin-bottom: 20px; width: 80%; max-width: 300px; text-align: center; }
-        .player-btn { background: linear-gradient(145deg, #f39c12, #e67e22); color: white; border: none; padding: 25px; font-size: 24px; border-radius: 20px; font-weight: bold; width: 100%; cursor: pointer; box-shadow: 0 5px #d35400; transition: 0.2s; }
+        .correct-text { color: var(--success) !important; font-weight: 900; }
+
+        /* 按鈕與介面 */
+        .player-btn { background: linear-gradient(145deg, #f39c12, #e67e22); color: white; border: none; padding: 20px; font-size: 24px; border-radius: 20px; font-weight: bold; width: 100%; cursor: pointer; box-shadow: 0 5px #d35400; transition: 0.2s; }
+        .player-btn:active { transform: translateY(3px); box-shadow: 0 2px #d35400; }
         .player-btn:disabled { background: #555; box-shadow: none; transform: translateY(5px); cursor: not-allowed; }
-        #bgm-control { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.6); color: white; border: 1px solid #555; padding: 12px; border-radius: 10px; z-index: 1000; cursor: pointer; }
+        #bgm-control { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.7); color: white; border: 1px solid #555; padding: 12px; border-radius: 10px; z-index: 1000; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -51,12 +71,12 @@
 
 <div id="player-view" class="hidden">
     <div id="player-waiting" style="margin-top: 150px; text-align: center;">
-        <h2 id="welcome-msg" style="font-size: 32px;">準備中...</h2>
+        <h2 style="font-size: 32px;">準備中...</h2>
         <p id="wait-msg" style="font-size: 22px; color: #f1c40f;">等待指揮官發布任務...</p>
     </div>
     <div id="player-q-zone" class="hidden">
-        <div id="p-q-timer" style="text-align: center; font-size: 30px; color: #e74c3c; font-weight: bold; margin-bottom: 10px;">⏳ 剩餘時間: 10s</div>
-        <h3 id="p-title" style="text-align: center; font-size: 28px; padding: 10px; min-height: 80px;">任務載入中...</h3>
+        <div id="p-q-timer" style="text-align: center; font-size: 30px; color: #e74c3c; font-weight: bold; margin-bottom: 10px;">⏳ 10s</div>
+        <h3 id="p-title" style="text-align: center; font-size: 28px; padding: 10px; min-height: 80px;"></h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px;">
             <button class="player-btn q-btn" onclick="submitAns('A')">A. <span id="pa"></span></button>
             <button class="player-btn q-btn" onclick="submitAns('B')">B. <span id="pb"></span></button>
@@ -67,27 +87,32 @@
 </div>
 
 <div id="display-view" class="hidden">
-    <button id="bgm-control" onclick="toggleBGM()">🎵 啟動 BGM</button>
+    <button id="bgm-control" onclick="toggleBGM()">🎵 啟動音效</button>
     <div style="display: flex; justify-content: center; align-items: center; gap: 30px;">
-        <h1 id="round-num" style="font-size: 55px; margin: 10px 0; color: var(--primary);">READY?</h1>
+        <h1 id="round-num" style="font-size: 55px; margin: 10px 0; color: var(--primary); text-shadow: 0 0 10px rgba(243,156,18,0.5);">READY?</h1>
         <div id="d-timer" style="font-size: 55px; font-weight: bold; color: #e74c3c;"></div>
     </div>
+    
     <div id="boss-container">
         <div id="dmg-text"></div>
         <img id="boss-img" src="Boss_normal.png">
     </div>
+
     <div id="hp-wrapper">
         <div id="hp-bar"></div>
-        <div style="position: absolute; width:100%; top:0; line-height:45px; font-weight:900; font-size: 24px;">HP: <span id="hp-text">12000</span> / 12000</div>
+        <div style="position: absolute; width:100%; top:0; line-height:45px; font-weight:900; font-size: 24px; text-shadow: 1px 1px 2px #000;">HP: <span id="hp-text">12000</span> / 12000</div>
     </div>
+
     <div id="mvp-announcement" class="q-card hidden" style="border-color: gold;">
         <h2 style="color: gold; font-size: 45px; margin: 10px 0;">🏆 戰場英雄榜 🏆</h2>
         <div id="mvp-list" style="font-size: 30px; line-height: 1.4;"></div>
     </div>
+
     <div id="display-q-box" class="q-card hidden">
         <h2 id="d-title" style="margin-top:0; font-size: 40px; border-bottom: 2px solid #555; padding-bottom: 15px;"></h2>
         <div class="option-grid" id="d-options"></div>
     </div>
+
     <div id="msg-box" style="margin-top: 20px;"></div>
     <div id="vote-count" style="color: #888; font-size: 28px; font-weight: bold; margin-top: 15px;">已集結戰士: 0</div>
 </div>
@@ -95,9 +120,9 @@
 <div id="admin-view" class="hidden" style="text-align: center; padding: 20px;">
     <h2>指揮官作戰面板</h2>
     <div id="admin-btns" style="background:#222; padding:20px; border-radius:15px; margin-bottom: 20px;"></div>
-    <button onclick="calculateResult()" style="background:var(--success); color:white; width:85%; padding:25px; font-size:32px; border:none; border-radius:15px; font-weight: bold; cursor: pointer;">💥 全員發動攻擊！</button>
+    <button onclick="calculateResult()" style="background:var(--success); color:white; width:85%; padding:25px; font-size:32px; border:none; border-radius:15px; font-weight: bold; cursor: pointer; box-shadow: 0 8px #1e8449;">💥 全員發動攻擊！</button>
     <br><br><br>
-    <button onclick="resetGame()" style="background:#c0392b; color:white; padding:12px 24px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場 (全體重置)</button>
+    <button onclick="resetGame()" style="background:#c0392b; color:white; padding:12px 24px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場 (全體刷新)</button>
 </div>
 
 <script>
@@ -131,9 +156,8 @@
     const uid = localStorage.getItem('game_uid') || Math.random().toString(36).substring(7);
     localStorage.setItem('game_uid', uid);
 
-    // --- 修改處：重置監聽邏輯 ---
+    // --- 重置監聽 (Admin端不參與刷新) ---
     db.ref('resetTrigger').on('value', snap => {
-        // 只有非管理員角色，或者 resetTrigger 被設為 true 時才動作
         if (snap.val() === true && role !== 'admin') {
             if(role === 'player') localStorage.removeItem('boss_player_name');
             location.reload();
@@ -149,32 +173,32 @@
         document.getElementById('player-view').classList.remove('hidden');
     }
 
-    // 初始化畫面
-    if(role === 'player' && !localStorage.getItem('boss_player_name')) {
-        document.getElementById('name-overlay').classList.remove('hidden');
-    } else if(role === 'player') {
-        document.getElementById('player-view').classList.remove('hidden');
-        db.ref('players/' + uid).set(localStorage.getItem('boss_player_name'));
+    // 初始化角色界面
+    if(role === 'player') {
+        if(!localStorage.getItem('boss_player_name')) document.getElementById('name-overlay').classList.remove('hidden');
+        else {
+            document.getElementById('player-view').classList.remove('hidden');
+            db.ref('players/' + uid).set(localStorage.getItem('boss_player_name'));
+        }
     } else if(role === 'display') {
         document.getElementById('display-view').classList.remove('hidden');
     } else if(role === 'admin') {
         document.getElementById('admin-view').classList.remove('hidden');
         const container = document.getElementById('admin-btns');
-        for(let i=1; i<=10; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="margin:5px; padding:12px; cursor:pointer;">任務 ${i}</button>`;
+        for(let i=1; i<=10; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="margin:5px; padding:10px; cursor:pointer; width:80px;">任務 ${i}</button>`;
     }
 
     function toggleBGM() {
         const bgm = document.getElementById('game-bgm');
-        const vbgm = document.getElementById('victory-bgm');
-        if (bgm.paused && vbgm.paused) { bgm.play(); document.getElementById('bgm-control').innerText = "⏸ 暫停音效"; }
-        else { bgm.pause(); vbgm.pause(); document.getElementById('bgm-control').innerText = "▶ 播放音效"; }
+        if (bgm.paused) { bgm.play(); document.getElementById('bgm-control').innerText = "⏸ 暫停音效"; }
+        else { bgm.pause(); document.getElementById('bgm-control').innerText = "▶ 播放音效"; }
     }
 
     let hasSubmitted = false;
     let lastQNum = -1;
     let currentGlobalTimeLeft = 10;
 
-    // 狀態監聽
+    // --- 主邏輯監聽 ---
     db.ref('gameState').on('value', snap => {
         const state = snap.val() || { hp: 12000, status: 'waiting' };
         currentGlobalTimeLeft = state.timeLeft || 0;
@@ -184,43 +208,47 @@
             lastQNum = state.q;
         }
 
-        // 人數顯示邏輯
-        Promise.all([db.ref('players').once('value'), db.ref('responses').once('value')]).then(results => {
-            if(role !== 'display') return;
-            const total = results[0].numChildren();
-            const answered = results[1].numChildren();
-            const countEl = document.getElementById('vote-count');
-            if (state.status === 'answering') {
-                countEl.innerText = `已完成集氣: ${answered}`;
-                countEl.style.color = "#f1c40f";
-            } else if (state.status === 'result') {
-                countEl.innerText = `本次參與戰士: ${total}`;
-                countEl.style.color = "white";
-            } else {
-                countEl.innerText = `已集結戰士: ${total}`;
-                countEl.style.color = "#888";
-            }
-        });
+        // 更新人數顯示 (僅 Display)
+        if(role === 'display') {
+            Promise.all([db.ref('players').once('value'), db.ref('responses').once('value')]).then(results => {
+                const total = results[0].numChildren();
+                const answered = results[1].numChildren();
+                const countEl = document.getElementById('vote-count');
+                if (state.status === 'answering') {
+                    countEl.innerText = `集氣中: ${answered} / ${total}`;
+                    countEl.style.color = "#f1c40f";
+                } else {
+                    countEl.innerText = `已集結戰士: ${total}`;
+                    countEl.style.color = "#888";
+                }
+            });
+        }
 
-        // 計時器
-        if(state.timeLeft !== undefined && state.status === 'answering') {
-            const timerStr = state.timeLeft > 0 ? `⏳ ${state.timeLeft}s` : "⌛ 時間到！";
+        // 處理計時器
+        const timerStr = state.timeLeft > 0 ? `⏳ ${state.timeLeft}s` : "⌛ 時間到！";
+        if(state.status === 'answering') {
             if(role === 'display') document.getElementById('d-timer').innerText = timerStr;
-            if(role === 'player') {
-                const pTimer = document.getElementById('p-q-timer');
-                if(pTimer) pTimer.innerText = timerStr;
-                if(state.timeLeft <= 0) document.querySelectorAll('.q-btn').forEach(b => b.disabled = true);
-            }
+            if(role === 'player') document.getElementById('p-q-timer').innerText = timerStr;
+        } else {
+            if(role === 'display') document.getElementById('d-timer').innerText = "";
         }
 
         // Display 畫面渲染
         if(role === 'display') {
             const bossImg = document.getElementById('boss-img');
-            document.getElementById('hp-bar').style.width = (state.hp/12000*100) + "%";
+            const hpBar = document.getElementById('hp-bar');
+            const hpPercent = (state.hp/12000*100);
+            
+            hpBar.style.width = hpPercent + "%";
             document.getElementById('hp-text').innerText = state.hp;
+            
+            // 血量過低警告
+            if(hpPercent < 30) hpBar.classList.add('hp-low');
+            else hpBar.classList.remove('hp-low');
+
             if(state.hp <= 0) {
                 bossImg.src = "Boss_hurt.png"; bossImg.style.transform = "scale(0) rotate(720deg)";
-                confetti({ particleCount: 300, spread: 160 });
+                confetti({ particleCount: 400, spread: 100, origin: { y: 0.6 } });
                 findMVP(); document.getElementById('round-num').innerText = "VICTORY!";
             } else {
                 bossImg.src = state.hp <= 6000 ? "Boss_angry.png" : "Boss_normal.png";
@@ -228,21 +256,40 @@
 
             if(state.status === 'answering') {
                 const q = questionBank[state.q];
-                document.getElementById('mvp-announcement').classList.add('hidden');
                 document.getElementById('display-q-box').classList.remove('hidden');
+                document.getElementById('mvp-announcement').classList.add('hidden');
                 document.getElementById('d-title').innerText = q.t;
                 document.getElementById('d-options').innerHTML = `<div>A: ${q.o.A}</div><div>B: ${q.o.B}</div><div>C: ${q.o.C}</div><div>D: ${q.o.D}</div>`;
                 document.getElementById('msg-box').innerHTML = "";
                 document.getElementById('round-num').innerText = "集氣中...";
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
+                
+                // 傷害特效觸發
+                if(state.lastDmg > 0) {
+                    const displayEl = document.getElementById('display-view');
+                    const dmgText = document.getElementById('dmg-text');
+                    
+                    displayEl.classList.add('screen-shake', 'hurt-flash');
+                    bossImg.classList.add('shake');
+                    dmgText.innerText = "-" + state.lastDmg;
+                    dmgText.style.fontSize = state.lastDmg > 1000 ? "130px" : "80px";
+                    dmgText.classList.add('dmg-float');
+
+                    setTimeout(() => {
+                        displayEl.classList.remove('screen-shake', 'hurt-flash');
+                        bossImg.classList.remove('shake');
+                        dmgText.classList.remove('dmg-float');
+                    }, 1200);
+                }
+
                 const stats = state.stats || { A:0, B:0, C:0, D:0 };
                 const total = (stats.A + stats.B + stats.C + stats.D) || 1;
                 const currentQ = questionBank[state.q];
                 document.getElementById('msg-box').innerHTML = `
-                    <div style="font-size: 38px; font-weight: bold;">
-                        <div style="color: #2ecc71;">任務成功率：${state.correctRate || 0}%</div>
-                        <div style="font-size: 50px; color: #e74c3c; margin-bottom:15px;">造成傷害：${state.lastDmg}</div>
+                    <div style="font-size: 38px; font-weight: bold; margin-bottom: 20px;">
+                        <div style="color: #2ecc71;">任務成功率：${state.correctRate}%</div>
+                        <div style="font-size: 55px; color: #e74c3c;">總傷害：${state.lastDmg}</div>
                     </div>
                     <div class="stat-container">
                         ${['A','B','C','D'].map(opt => {
@@ -271,15 +318,25 @@
             } else {
                 document.getElementById('player-q-zone').classList.add('hidden');
                 document.getElementById('player-waiting').classList.remove('hidden');
-                document.getElementById('wait-msg').innerText = hasSubmitted ? "集氣完成，準備攻擊！💥" : (state.status === 'result' ? "任務結算中..." : "等待指揮官發布任務...");
+                document.getElementById('wait-msg').innerText = hasSubmitted ? "集氣完成，準備攻擊！💥" : "等待指揮官發布任務...";
             }
         }
     });
 
+    // --- 管理員動作 ---
     let timerInterval = null;
     function changeQ(num) {
         clearInterval(timerInterval);
         db.ref('responses').remove();
+        
+        // Boss 登場特效
+        const bossImg = document.getElementById('boss-img');
+        if(bossImg) {
+            bossImg.classList.remove('boss-spawn');
+            void bossImg.offsetWidth; 
+            bossImg.classList.add('boss-spawn');
+        }
+
         let timeLeft = 10;
         db.ref('gameState').update({ q: num, status: 'answering', lastDmg: 0, stats: null, timeLeft: timeLeft });
         timerInterval = setInterval(() => {
@@ -305,14 +362,17 @@
             const resps = data.responses || {};
             const qNum = data.gameState.q;
             const qData = questionBank[qNum];
+            if(Object.keys(resps).length === 0) return alert("還沒人集氣！");
+            
             db.ref('history').push({ qNum: qNum, players: resps });
             const players = Object.values(resps);
-            if(players.length === 0) return alert("沒人集氣！");
             const stats = { A:0, B:0, C:0, D:0 };
             players.forEach(p => { if(stats[p.ans] !== undefined) stats[p.ans]++; });
+            
             let correctCount = (qData.a === "ALL") ? players.length : players.filter(p => p.ans === qData.a).length;
             let rate = Math.round((correctCount / players.length) * 100);
             let dmg = Math.floor((rate / 100) * 1500);
+            
             db.ref('gameState').update({ status: 'result', hp: Math.max(0, data.gameState.hp - dmg), lastDmg: dmg, correctRate: rate, stats: stats, timeLeft: 0 });
         });
     }
@@ -334,10 +394,7 @@
                     }
                 });
             });
-            const sorted = Object.entries(scores).sort((a,b) => {
-                if(b[1].count !== a[1].count) return b[1].count - a[1].count;
-                return b[1].totalTime - a[1].totalTime;
-            });
+            const sorted = Object.entries(scores).sort((a,b) => (b[1].count !== a[1].count) ? b[1].count - a[1].count : b[1].totalTime - a[1].totalTime);
             document.getElementById('mvp-announcement').classList.remove('hidden');
             document.getElementById('mvp-list').innerHTML = sorted.slice(0, 8).map((p, i) => {
                 let icon = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : "🎖️"));
@@ -349,12 +406,9 @@
         });
     }
 
-    // --- 修改處：優化重置邏輯，避免管理員端無限循環 ---
     function resetGame() {
-        if(confirm("⚠ 注意：這將會清除所有玩家記錄、分數與血量。確定嗎？")) {
+        if(confirm("⚠ 注意：這將會清空所有數據並重置戰場。確定嗎？")) {
             clearInterval(timerInterval);
-            
-            // 1. 先重置所有數據，resetTrigger 設為 false 確保乾淨
             db.ref('/').update({
                 gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0, stats: null, timeLeft: 10 },
                 responses: null,
@@ -362,16 +416,12 @@
                 players: null,
                 resetTrigger: false 
             }).then(() => {
-                // 2. 數據清空後，才短暫開啟 Trigger 通知其他端點 (Display/Player)
                 return db.ref('resetTrigger').set(true);
             }).then(() => {
-                // 3. 管理員端不重新整理，而是直接手動重設變數，確保流暢
                 setTimeout(() => {
                     db.ref('resetTrigger').set(false);
-                    alert("戰場已重置完成！");
+                    alert("戰場已完成初始化！");
                 }, 1500);
-            }).catch(err => {
-                alert("重置錯誤：" + err.message);
             });
         }
     }
