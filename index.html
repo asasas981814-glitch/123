@@ -31,7 +31,6 @@
         .stat-bar-fill { height: 100%; background: #777; transition: width 1s ease-out; }
         .correct-fill { background: var(--success) !important; box-shadow: 0 0 15px var(--success); }
         .stat-value { width: 150px; text-align: right; font-size: 20px; color: #aaa; }
-        .correct-text { color: var(--success) !important; font-weight: 900; }
         #name-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         input[type="text"] { padding: 15px; font-size: 20px; border-radius: 10px; border: none; margin-bottom: 20px; width: 80%; max-width: 300px; text-align: center; }
         .player-btn { background: linear-gradient(145deg, #f39c12, #e67e22); color: white; border: none; padding: 25px; font-size: 24px; border-radius: 20px; font-weight: bold; width: 100%; cursor: pointer; box-shadow: 0 5px #d35400; transition: 0.2s; }
@@ -127,17 +126,17 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const role = new URLSearchParams(window.location.search).get('role') || 'player';
+    const params = new URLSearchParams(window.location.search);
+    const role = params.get('role') || 'player';
     const uid = localStorage.getItem('game_uid') || Math.random().toString(36).substring(7);
     localStorage.setItem('game_uid', uid);
 
-    // 監聽重置
-    let isResetting = false;
+    // --- 修改處：重置監聽邏輯 ---
     db.ref('resetTrigger').on('value', snap => {
-        if (snap.val() === true && !isResetting) {
-            isResetting = true;
+        // 只有非管理員角色，或者 resetTrigger 被設為 true 時才動作
+        if (snap.val() === true && role !== 'admin') {
             if(role === 'player') localStorage.removeItem('boss_player_name');
-            setTimeout(() => { location.reload(); }, 100);
+            location.reload();
         }
     });
 
@@ -150,6 +149,7 @@
         document.getElementById('player-view').classList.remove('hidden');
     }
 
+    // 初始化畫面
     if(role === 'player' && !localStorage.getItem('boss_player_name')) {
         document.getElementById('name-overlay').classList.remove('hidden');
     } else if(role === 'player') {
@@ -174,23 +174,18 @@
     let lastQNum = -1;
     let currentGlobalTimeLeft = 10;
 
-    // --- 核心邏輯：狀態監聽 ---
+    // 狀態監聽
     db.ref('gameState').on('value', snap => {
         const state = snap.val() || { hp: 12000, status: 'waiting' };
         currentGlobalTimeLeft = state.timeLeft || 0;
         
         if (state.q !== lastQNum || state.status === 'answering') {
-            if (state.status === 'answering' && state.q !== lastQNum) {
-                hasSubmitted = false;
-            }
+            if (state.status === 'answering' && state.q !== lastQNum) hasSubmitted = false;
             lastQNum = state.q;
         }
 
-        // 動態人數更新
-        Promise.all([
-            db.ref('players').once('value'),
-            db.ref('responses').once('value')
-        ]).then(results => {
+        // 人數顯示邏輯
+        Promise.all([db.ref('players').once('value'), db.ref('responses').once('value')]).then(results => {
             if(role !== 'display') return;
             const total = results[0].numChildren();
             const answered = results[1].numChildren();
@@ -207,27 +202,22 @@
             }
         });
 
-        // 計時器邏輯
+        // 計時器
         if(state.timeLeft !== undefined && state.status === 'answering') {
             const timerStr = state.timeLeft > 0 ? `⏳ ${state.timeLeft}s` : "⌛ 時間到！";
             if(role === 'display') document.getElementById('d-timer').innerText = timerStr;
             if(role === 'player') {
                 const pTimer = document.getElementById('p-q-timer');
                 if(pTimer) pTimer.innerText = timerStr;
-                if(state.timeLeft <= 0) {
-                    document.querySelectorAll('.q-btn').forEach(b => b.disabled = true);
-                }
+                if(state.timeLeft <= 0) document.querySelectorAll('.q-btn').forEach(b => b.disabled = true);
             }
-        } else {
-            if(role === 'display') document.getElementById('d-timer').innerText = "";
         }
 
-        // Display 畫面處理
+        // Display 畫面渲染
         if(role === 'display') {
             const bossImg = document.getElementById('boss-img');
             document.getElementById('hp-bar').style.width = (state.hp/12000*100) + "%";
             document.getElementById('hp-text').innerText = state.hp;
-            
             if(state.hp <= 0) {
                 bossImg.src = "Boss_hurt.png"; bossImg.style.transform = "scale(0) rotate(720deg)";
                 confetti({ particleCount: 300, spread: 160 });
@@ -246,22 +236,11 @@
                 document.getElementById('round-num').innerText = "集氣中...";
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
-                if(state.lastDmg > 0) {
-                    bossImg.classList.add('shake');
-                    const dmgText = document.getElementById('dmg-text');
-                    dmgText.innerText = "-" + state.lastDmg;
-                    dmgText.classList.add('dmg-float');
-                    document.getElementById('display-view').classList.add('hurt-flash');
-                    setTimeout(() => { 
-                        bossImg.classList.remove('shake'); dmgText.classList.remove('dmg-float'); 
-                        document.getElementById('display-view').classList.remove('hurt-flash');
-                    }, 1000);
-                }
                 const stats = state.stats || { A:0, B:0, C:0, D:0 };
                 const total = (stats.A + stats.B + stats.C + stats.D) || 1;
                 const currentQ = questionBank[state.q];
                 document.getElementById('msg-box').innerHTML = `
-                    <div style="font-size: 38px; font-weight: bold; text-shadow: 2px 2px 4px #000;">
+                    <div style="font-size: 38px; font-weight: bold;">
                         <div style="color: #2ecc71;">任務成功率：${state.correctRate || 0}%</div>
                         <div style="font-size: 50px; color: #e74c3c; margin-bottom:15px;">造成傷害：${state.lastDmg}</div>
                     </div>
@@ -271,7 +250,7 @@
                             return `<div class="stat-row">
                                 <div class="stat-label ${isAns ? 'correct-text' : ''}">${opt}: ${currentQ.o[opt]} ${isAns ? '✅' : ''}</div>
                                 <div class="stat-bar-bg"><div class="stat-bar-fill ${isAns ? 'correct-fill' : ''}" style="width: ${(stats[opt]/total*100)}%"></div></div>
-                                <div class="stat-value ${isAns ? 'correct-text' : ''}">${stats[opt]} 人</div>
+                                <div class="stat-value">${stats[opt]} 人</div>
                             </div>`;
                         }).join('')}
                     </div>`;
@@ -279,7 +258,7 @@
             }
         }
 
-        // Player 畫面處理
+        // Player 畫面渲染
         if(role === 'player') {
             const q = questionBank[state.q];
             if(state.status === 'answering' && !hasSubmitted) {
@@ -295,17 +274,6 @@
                 document.getElementById('wait-msg').innerText = hasSubmitted ? "集氣完成，準備攻擊！💥" : (state.status === 'result' ? "任務結算中..." : "等待指揮官發布任務...");
             }
         }
-    });
-
-    // 監聽作答人數變動（為了即時跳動）
-    db.ref('responses').on('value', snap => {
-        if(role !== 'display') return;
-        const answered = snap.numChildren();
-        db.ref('gameState').once('value', stateSnap => {
-            if(stateSnap.val().status === 'answering') {
-                document.getElementById('vote-count').innerText = `已完成集氣: ${answered}`;
-            }
-        });
     });
 
     let timerInterval = null;
@@ -381,27 +349,29 @@
         });
     }
 
-    // --- 優化後的重置函式 ---
+    // --- 修改處：優化重置邏輯，避免管理員端無限循環 ---
     function resetGame() {
-        if(confirm("⚠ 注意：這將會清除所有玩家記錄、分數與血量，並重新整理所有人的網頁。確定嗎？")) {
+        if(confirm("⚠ 注意：這將會清除所有玩家記錄、分數與血量。確定嗎？")) {
             clearInterval(timerInterval);
             
-            // 1. 先重置核心數據
+            // 1. 先重置所有數據，resetTrigger 設為 false 確保乾淨
             db.ref('/').update({
                 gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0, stats: null, timeLeft: 10 },
                 responses: null,
                 history: null,
-                players: null
+                players: null,
+                resetTrigger: false 
             }).then(() => {
-                // 2. 數據重置完成後，發送重新整理信號
+                // 2. 數據清空後，才短暫開啟 Trigger 通知其他端點 (Display/Player)
                 return db.ref('resetTrigger').set(true);
             }).then(() => {
-                // 3. 短暫延遲後關閉信號 (避免進入死循環)
+                // 3. 管理員端不重新整理，而是直接手動重設變數，確保流暢
                 setTimeout(() => {
                     db.ref('resetTrigger').set(false);
-                }, 1000);
+                    alert("戰場已重置完成！");
+                }, 1500);
             }).catch(err => {
-                alert("重置發生錯誤：" + err.message);
+                alert("重置錯誤：" + err.message);
             });
         }
     }
