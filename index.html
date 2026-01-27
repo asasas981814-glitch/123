@@ -83,7 +83,7 @@
     </div>
     <div id="mvp-announcement" class="q-card hidden" style="border-color: gold;">
         <h2 style="color: gold; font-size: 45px; margin: 10px 0;">🏆 戰場英雄榜 🏆</h2>
-        <div id="mvp-list" style="font-size: 36px; line-height: 1.6;"></div>
+        <div id="mvp-list" style="font-size: 30px; line-height: 1.4;"></div>
     </div>
     <div id="display-q-box" class="q-card hidden">
         <h2 id="d-title" style="margin-top:0; font-size: 40px; border-bottom: 2px solid #555; padding-bottom: 15px;"></h2>
@@ -169,14 +169,14 @@
         else { bgm.pause(); vbgm.pause(); document.getElementById('bgm-control').innerText = "▶ 播放音效"; }
     }
 
-    // 核心新增：記錄 User 是否已在當前題目提交答案
     let hasSubmitted = false;
     let lastQNum = -1;
+    let currentGlobalTimeLeft = 10; // 追蹤目前剩餘秒數
 
     db.ref('gameState').on('value', snap => {
         const state = snap.val() || { hp: 12000, status: 'waiting' };
+        currentGlobalTimeLeft = state.timeLeft || 0; // 同步秒數
         
-        // 如果題目編號改變，或是進入 answering 狀態，重置提交狀態
         if (state.q !== lastQNum || state.status === 'answering') {
             if (state.status === 'answering' && state.q !== lastQNum) {
                 hasSubmitted = false;
@@ -258,7 +258,6 @@
 
         if(role === 'player') {
             const q = questionBank[state.q];
-            // 關鍵判斷：只有在 answering 狀態，且還沒提交答案過，且時間還在，才顯示答題區
             if(state.status === 'answering' && !hasSubmitted) {
                 document.getElementById('player-waiting').classList.add('hidden');
                 document.getElementById('player-q-zone').classList.remove('hidden');
@@ -267,10 +266,8 @@
                 document.getElementById('pc').innerText = q.o.C; document.getElementById('pd').innerText = q.o.D;
                 if(state.timeLeft > 0) document.querySelectorAll('.q-btn').forEach(b => b.disabled = false);
             } else {
-                // 如果已經提交、時間到、或是處於結算中，通通顯示等待畫面
                 document.getElementById('player-q-zone').classList.add('hidden');
                 document.getElementById('player-waiting').classList.remove('hidden');
-                
                 if (hasSubmitted) {
                     document.getElementById('wait-msg').innerText = "集氣完成，準備攻擊！💥";
                 } else if (state.status === 'result') {
@@ -300,8 +297,13 @@
     }
 
     function submitAns(ans) {
-        hasSubmitted = true; // 本地鎖定
-        db.ref('responses/' + uid).set({ ans: ans, name: localStorage.getItem('boss_player_name') });
+        hasSubmitted = true;
+        // 新增記錄 timeLeft (剩餘秒數)
+        db.ref('responses/' + uid).set({ 
+            ans: ans, 
+            name: localStorage.getItem('boss_player_name'),
+            timeBonus: currentGlobalTimeLeft 
+        });
         document.getElementById('player-q-zone').classList.add('hidden');
         document.getElementById('player-waiting').classList.remove('hidden');
         document.getElementById('wait-msg').innerText = "集氣完成，準備攻擊！💥";
@@ -323,32 +325,44 @@
             let rate = Math.round((correctCount / players.length) * 100);
             let dmg = Math.floor((rate / 100) * 1500);
             db.ref('gameState').update({ status: 'result', hp: Math.max(0, data.gameState.hp - dmg), lastDmg: dmg, correctRate: rate, stats: stats, timeLeft: 0 });
-            // 注意：這裡不移除 responses，留到 changeQ 再移除
         });
     }
 
     function findMVP() {
         db.ref('history').once('value', snap => {
             const history = snap.val(); if(!history) return;
-            const scores = {}; 
+            const scores = {}; // 格式: { "名字": { count: 答對數, totalTime: 總剩餘秒數 } }
+            
             Object.values(history).forEach(round => {
                 const correctAns = questionBank[round.qNum].a;
                 if(!round.players) return;
                 Object.values(round.players).forEach(pData => {
                     if(pData.name) {
-                        if(!scores[pData.name]) scores[pData.name] = 0;
-                        if(correctAns === "ALL" || pData.ans === correctAns) scores[pData.name] += 1;
+                        if(!scores[pData.name]) scores[pData.name] = { count: 0, totalTime: 0 };
+                        if(correctAns === "ALL" || pData.ans === correctAns) {
+                            scores[pData.name].count += 1;
+                            scores[pData.name].totalTime += (pData.timeBonus || 0);
+                        }
                     }
                 });
             });
-            const sorted = Object.entries(scores).sort((a,b) => b[1] - a[1]);
+
+            // 雙重排序：1. 答對次數(大到小) 2. 總剩餘秒數(大到小)
+            const sorted = Object.entries(scores).sort((a,b) => {
+                if(b[1].count !== a[1].count) return b[1].count - a[1].count;
+                return b[1].totalTime - a[1].totalTime;
+            });
+
             const mvpBox = document.getElementById('mvp-announcement');
             const mvpList = document.getElementById('mvp-list');
             mvpBox.classList.remove('hidden');
             if(sorted.length > 0) {
-                mvpList.innerHTML = sorted.slice(0, 5).map((p, i) => {
+                mvpList.innerHTML = sorted.slice(0, 8).map((p, i) => {
                     let icon = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : "🎖️"));
-                    return `<div style="margin:12px 0;">${icon} <span style="color:white">${p[0]}</span> —— ${p[1]} 次</div>`;
+                    return `<div style="margin:10px 0; display:flex; justify-content:space-between; padding:0 30px;">
+                        <span>${icon} <span style="color:white">${p[0]}</span></span>
+                        <span style="color:var(--primary)">${p[1].count} 次 (${p[1].totalTime}s)</span>
+                    </div>`;
                 }).join('');
             }
         });
