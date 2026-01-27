@@ -232,7 +232,7 @@
                 const total = results[0].numChildren();
                 const answered = results[1].numChildren();
                 const countEl = document.getElementById('vote-count');
-                countEl.innerText = `集氣中: ${answered} / ${total}`;
+                countEl.innerText = `任務進行中: ${answered} / ${total}`;
                 countEl.style.color = "#f1c40f";
             });
         }
@@ -269,7 +269,7 @@
                 document.getElementById('d-title').innerText = q.t;
                 document.getElementById('d-options').innerHTML = `<div>A: ${q.o.A}</div><div>B: ${q.o.B}</div><div>C: ${q.o.C}</div><div>D: ${q.o.D}</div>`;
                 document.getElementById('msg-box').innerHTML = "";
-                document.getElementById('round-num').innerText = "集氣中...";
+                document.getElementById('round-num').innerText = "任務進行中...";
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
                 if(state.lastDmg > 0) {
@@ -320,7 +320,7 @@
             } else {
                 document.getElementById('player-q-zone').classList.add('hidden');
                 document.getElementById('player-waiting').classList.remove('hidden');
-                document.getElementById('wait-msg').innerText = hasSubmitted ? "集氣完成，準備攻擊！💥" : "等待指揮官發布任務...";
+                document.getElementById('wait-msg').innerText = hasSubmitted ? "任務完成，準備攻擊！💥" : "等待指揮官發布任務...";
             }
         }
     });
@@ -395,7 +395,7 @@
                 let icon = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : "🎖️"));
                 return `<div style="margin:10px 0; display:flex; justify-content:space-between; padding:0 30px;">
                     <span>${icon} <span style="color:white">${p[0]}</span></span>
-                    <span style="color:var(--primary)">${p[1].count} 擊 (${p[1].totalTime}s)</span>
+                    <span style="color:var(--primary)">${p[1].count} 任務完成 (${p[1].totalTime}s)</span>
                 </div>`;
             }).join('');
         });
@@ -414,4 +414,5 @@
 </script>
 </body>
 </html>
+
 
