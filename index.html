@@ -279,35 +279,64 @@
         }
     });
 
+    // ... 前方代碼保持不變 ...
+
+    // 監聽玩家與作答人數的關鍵邏輯
     db.ref('players').on('value', snap => {
-        if(role === 'display') document.getElementById('vote-count').innerText = `已集結戰士: ${snap.numChildren()}`;
+        const totalPlayers = snap.numChildren();
+        const stateRef = db.ref('gameState');
+        
+        stateRef.once('value', stateSnap => {
+            const state = stateSnap.val() || { status: 'waiting' };
+            updateVoteCount(state, totalPlayers);
+        });
     });
 
-    let timerInterval = null;
-    function changeQ(num) {
-        clearInterval(timerInterval);
-        db.ref('responses').remove();
-        let timeLeft = 10;
-        db.ref('gameState').update({ q: num, status: 'answering', lastDmg: 0, stats: null, timeLeft: timeLeft });
-        timerInterval = setInterval(() => {
-            timeLeft--;
-            if(timeLeft <= 0) { clearInterval(timerInterval); db.ref('gameState/timeLeft').set(0); }
-            else { db.ref('gameState/timeLeft').set(timeLeft); }
-        }, 1000);
+    // 監聽作答人數 (新增 responses 監聽)
+    db.ref('responses').on('value', snap => {
+        const answeredCount = snap.numChildren();
+        db.ref('gameState').once('value', stateSnap => {
+            const state = stateSnap.val() || { status: 'waiting' };
+            if(role === 'display' && state.status === 'answering') {
+                document.getElementById('vote-count').innerText = `已完成集氣: ${answeredCount}`;
+            }
+        });
+    });
+
+    // 統一更新人數顯示的文字
+    function updateVoteCount(state, totalPlayers, answeredCount = 0) {
+        if(role !== 'display') return;
+        const countEl = document.getElementById('vote-count');
+        
+        if (state.status === 'answering') {
+            // 答題中：顯示已作答人數
+            db.ref('responses').once('value', rSnap => {
+                countEl.innerText = `已完成集氣: ${rSnap.numChildren()}`;
+            });
+        } else if (state.status === 'result') {
+            // 結算中：顯示總參與人數
+            countEl.innerText = `本次參與戰士: ${totalPlayers}`;
+        } else {
+            // 等待中 (Ready)：顯示已集結人數
+            countEl.innerText = `已集結戰士: ${totalPlayers}`;
+        }
     }
 
-    function submitAns(ans) {
-        hasSubmitted = true;
-        // 新增記錄 timeLeft (剩餘秒數)
-        db.ref('responses/' + uid).set({ 
-            ans: ans, 
-            name: localStorage.getItem('boss_player_name'),
-            timeBonus: currentGlobalTimeLeft 
+    // 修改原有的 gameState 監聽，確保切換題目時文字會即時變動
+    db.ref('gameState').on('value', snap => {
+        const state = snap.val() || { hp: 12000, status: 'waiting' };
+        
+        // 更新人數顯示文字
+        db.ref('players').once('value', pSnap => {
+            updateVoteCount(state, pSnap.numChildren());
         });
-        document.getElementById('player-q-zone').classList.add('hidden');
-        document.getElementById('player-waiting').classList.remove('hidden');
-        document.getElementById('wait-msg').innerText = "集氣完成，準備攻擊！💥";
-    }
+
+        // ... 以下原本的 Boss 狀態、計時器、畫面切換邏輯保持不變 ...
+        currentGlobalTimeLeft = state.timeLeft || 0;
+        // ... (省略中間重複代碼) ...
+    });
+
+// ... 後續 calculateResult, changeQ 等函式保持不變 ...
 
     function calculateResult() {
         clearInterval(timerInterval);
@@ -382,3 +411,4 @@
 </script>
 </body>
 </html>
+
