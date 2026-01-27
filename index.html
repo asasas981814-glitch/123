@@ -51,7 +51,10 @@
         .correct-fill { background: var(--success) !important; box-shadow: 0 0 15px var(--success); }
         .correct-text { color: var(--success) !important; font-weight: 900; }
 
-        /* 按鈕與介面 */
+        /* 介面遮罩 (加入戰場) */
+        #name-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+
+        /* 按鈕樣式 */
         .player-btn { background: linear-gradient(145deg, #f39c12, #e67e22); color: white; border: none; padding: 20px; font-size: 24px; border-radius: 20px; font-weight: bold; width: 100%; cursor: pointer; box-shadow: 0 5px #d35400; transition: 0.2s; }
         .player-btn:active { transform: translateY(3px); box-shadow: 0 2px #d35400; }
         .player-btn:disabled { background: #555; box-shadow: none; transform: translateY(5px); cursor: not-allowed; }
@@ -66,10 +69,8 @@
 <div id="name-overlay" class="hidden">
     <div style="display: flex; flex-direction: column; align-items: center; gap: 20px; width: 85%;">
         <h2 style="color: var(--primary); font-size: 32px; margin-bottom: 10px; text-shadow: 0 0 10px rgba(243,156,18,0.3);">🛡️ 戰士加入戰場 🛡️</h2>
-        
         <input type="text" id="player-name-input" placeholder="請輸入您的名字..." 
                style="width: 100%; max-width: 300px; padding: 18px; font-size: 20px; border-radius: 15px; border: 2px solid var(--primary); background: #222; color: white; outline: none; text-align: center;">
-        
         <button class="player-btn" style="width: 100%; max-width: 300px; padding: 20px; font-size: 24px;" onclick="saveName()">加入戰鬥</button>
     </div>
 </div>
@@ -125,7 +126,7 @@
 <div id="admin-view" class="hidden" style="text-align: center; padding: 20px;">
     <h2>指揮官作戰面板</h2>
     <div id="admin-btns" style="background:#222; padding:20px; border-radius:15px; margin-bottom: 20px;"></div>
-    <button onclick="calculateResult()" style="background:var(--success); color:white; width:85%; padding:25px; font-size:32px; border:none; border-radius:15px; font-weight: bold; cursor: pointer; box-shadow: 0 8px #1e8449;">💥 全員發動攻擊！</button>
+    <button onclick="calculateResult()" style="background:var(--success); color:white; width:85%; padding:25px; font-size:32px; border:none; border-radius:15px; font-weight: bold; cursor: pointer;">💥 全員發動攻擊！</button>
     <br><br><br>
     <button onclick="resetGame()" style="background:#c0392b; color:white; padding:12px 24px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場 (全體刷新)</button>
 </div>
@@ -161,7 +162,7 @@
     const uid = localStorage.getItem('game_uid') || Math.random().toString(36).substring(7);
     localStorage.setItem('game_uid', uid);
 
-    // --- 重置監聽 (Admin端不參與刷新) ---
+    // 重置監聽
     db.ref('resetTrigger').on('value', snap => {
         if (snap.val() === true && role !== 'admin') {
             if(role === 'player') localStorage.removeItem('boss_player_name');
@@ -173,12 +174,12 @@
         const name = document.getElementById('player-name-input').value.trim();
         if(!name) return alert("請輸入戰士名！");
         localStorage.setItem('boss_player_name', name);
-        db.ref('players/' + uid).set(name);
+        db.ref('players/' + uid).set(name); // 這裡寫入後會觸發 Display 端的人數更新
         document.getElementById('name-overlay').classList.add('hidden');
         document.getElementById('player-view').classList.remove('hidden');
     }
 
-    // 初始化角色界面
+    // 初始化與各端點監聽
     if(role === 'player') {
         if(!localStorage.getItem('boss_player_name')) document.getElementById('name-overlay').classList.remove('hidden');
         else {
@@ -187,6 +188,18 @@
         }
     } else if(role === 'display') {
         document.getElementById('display-view').classList.remove('hidden');
+        
+        // --- 修正處：新增即時戰士人數監聽 ---
+        db.ref('players').on('value', snap => {
+            const total = snap.numChildren();
+            const countEl = document.getElementById('vote-count');
+            db.ref('gameState/status').once('value', sSnap => {
+                if(sSnap.val() !== 'answering') {
+                    countEl.innerText = `已集結戰士: ${total}`;
+                    countEl.style.color = "#888";
+                }
+            });
+        });
     } else if(role === 'admin') {
         document.getElementById('admin-view').classList.remove('hidden');
         const container = document.getElementById('admin-btns');
@@ -203,7 +216,7 @@
     let lastQNum = -1;
     let currentGlobalTimeLeft = 10;
 
-    // --- 主邏輯監聽 ---
+    // 遊戲狀態監聽
     db.ref('gameState').on('value', snap => {
         const state = snap.val() || { hp: 12000, status: 'waiting' };
         currentGlobalTimeLeft = state.timeLeft || 0;
@@ -213,23 +226,17 @@
             lastQNum = state.q;
         }
 
-        // 更新人數顯示 (僅 Display)
-        if(role === 'display') {
+        // Display 端的人數監聽 (作答期間)
+        if(role === 'display' && state.status === 'answering') {
             Promise.all([db.ref('players').once('value'), db.ref('responses').once('value')]).then(results => {
                 const total = results[0].numChildren();
                 const answered = results[1].numChildren();
                 const countEl = document.getElementById('vote-count');
-                if (state.status === 'answering') {
-                    countEl.innerText = `集氣中: ${answered} / ${total}`;
-                    countEl.style.color = "#f1c40f";
-                } else {
-                    countEl.innerText = `已集結戰士: ${total}`;
-                    countEl.style.color = "#888";
-                }
+                countEl.innerText = `集氣中: ${answered} / ${total}`;
+                countEl.style.color = "#f1c40f";
             });
         }
 
-        // 處理計時器
         const timerStr = state.timeLeft > 0 ? `⏳ ${state.timeLeft}s` : "⌛ 時間到！";
         if(state.status === 'answering') {
             if(role === 'display') document.getElementById('d-timer').innerText = timerStr;
@@ -238,16 +245,12 @@
             if(role === 'display') document.getElementById('d-timer').innerText = "";
         }
 
-        // Display 畫面渲染
         if(role === 'display') {
             const bossImg = document.getElementById('boss-img');
             const hpBar = document.getElementById('hp-bar');
             const hpPercent = (state.hp/12000*100);
-            
             hpBar.style.width = hpPercent + "%";
             document.getElementById('hp-text').innerText = state.hp;
-            
-            // 血量過低警告
             if(hpPercent < 30) hpBar.classList.add('hp-low');
             else hpBar.classList.remove('hp-low');
 
@@ -269,25 +272,20 @@
                 document.getElementById('round-num').innerText = "集氣中...";
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
-                
-                // 傷害特效觸發
                 if(state.lastDmg > 0) {
                     const displayEl = document.getElementById('display-view');
                     const dmgText = document.getElementById('dmg-text');
-                    
                     displayEl.classList.add('screen-shake', 'hurt-flash');
                     bossImg.classList.add('shake');
                     dmgText.innerText = "-" + state.lastDmg;
                     dmgText.style.fontSize = state.lastDmg > 1000 ? "130px" : "80px";
                     dmgText.classList.add('dmg-float');
-
                     setTimeout(() => {
                         displayEl.classList.remove('screen-shake', 'hurt-flash');
                         bossImg.classList.remove('shake');
                         dmgText.classList.remove('dmg-float');
                     }, 1200);
                 }
-
                 const stats = state.stats || { A:0, B:0, C:0, D:0 };
                 const total = (stats.A + stats.B + stats.C + stats.D) || 1;
                 const currentQ = questionBank[state.q];
@@ -310,7 +308,6 @@
             }
         }
 
-        // Player 畫面渲染
         if(role === 'player') {
             const q = questionBank[state.q];
             if(state.status === 'answering' && !hasSubmitted) {
@@ -328,26 +325,22 @@
         }
     });
 
-    // --- 管理員動作 ---
     let timerInterval = null;
     function changeQ(num) {
         clearInterval(timerInterval);
         db.ref('responses').remove();
-        
-        // Boss 登場特效
         const bossImg = document.getElementById('boss-img');
         if(bossImg) {
             bossImg.classList.remove('boss-spawn');
             void bossImg.offsetWidth; 
             bossImg.classList.add('boss-spawn');
         }
-
         let timeLeft = 10;
         db.ref('gameState').update({ q: num, status: 'answering', lastDmg: 0, stats: null, timeLeft: timeLeft });
         timerInterval = setInterval(() => {
             timeLeft--;
             if(timeLeft <= 0) { clearInterval(timerInterval); db.ref('gameState/timeLeft').set(0); }
-            else { db.ref('gameState/timeLeft').set(timeLeft); }
+            else db.ref('gameState/timeLeft').set(timeLeft);
         }, 1000);
     }
 
@@ -368,16 +361,13 @@
             const qNum = data.gameState.q;
             const qData = questionBank[qNum];
             if(Object.keys(resps).length === 0) return alert("還沒人集氣！");
-            
             db.ref('history').push({ qNum: qNum, players: resps });
             const players = Object.values(resps);
             const stats = { A:0, B:0, C:0, D:0 };
             players.forEach(p => { if(stats[p.ans] !== undefined) stats[p.ans]++; });
-            
             let correctCount = (qData.a === "ALL") ? players.length : players.filter(p => p.ans === qData.a).length;
             let rate = Math.round((correctCount / players.length) * 100);
             let dmg = Math.floor((rate / 100) * 1500);
-            
             db.ref('gameState').update({ status: 'result', hp: Math.max(0, data.gameState.hp - dmg), lastDmg: dmg, correctRate: rate, stats: stats, timeLeft: 0 });
         });
     }
@@ -416,21 +406,11 @@
             clearInterval(timerInterval);
             db.ref('/').update({
                 gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0, stats: null, timeLeft: 10 },
-                responses: null,
-                history: null,
-                players: null,
-                resetTrigger: false 
-            }).then(() => {
-                return db.ref('resetTrigger').set(true);
-            }).then(() => {
-                setTimeout(() => {
-                    db.ref('resetTrigger').set(false);
-                    alert("戰場已完成初始化！");
-                }, 1500);
-            });
+                responses: null, history: null, players: null, resetTrigger: false 
+            }).then(() => db.ref('resetTrigger').set(true))
+            .then(() => setTimeout(() => { db.ref('resetTrigger').set(false); alert("戰場已完成初始化！"); }, 1500));
         }
     }
 </script>
 </body>
 </html>
-
