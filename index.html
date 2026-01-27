@@ -131,11 +131,16 @@
     const uid = localStorage.getItem('game_uid') || Math.random().toString(36).substring(7);
     localStorage.setItem('game_uid', uid);
 
-    // 修正：防止重置循環
+    // --- 修正版重置邏輯 ---
+    let isResetting = false;
     db.ref('resetTrigger').on('value', snap => {
-        if (snap.val() === true) {
-            db.ref('resetTrigger').off();
-            location.reload();
+        if (snap.val() === true && !isResetting) {
+            isResetting = true;
+            // 如果是玩家，清除本地姓名紀錄
+            if(role === 'player') localStorage.removeItem('boss_player_name');
+            setTimeout(() => {
+                location.reload();
+            }, 100);
         }
     });
 
@@ -330,15 +335,19 @@
     }
 
     function resetGame() {
-        if(confirm("確定重置？這會讓大螢幕回到初始畫面，並要求玩家重新簽到。")) {
+        if(confirm("確定重置？這會讓所有端點重新整理。")) {
             clearInterval(timerInterval);
+            // 核心修正：先設為 true 觸發所有人，隨後立即清空資料
             db.ref('resetTrigger').set(true).then(() => {
-                setTimeout(() => {
-                    db.ref('/').update({
-                        gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0, stats: null, timeLeft: 10 },
-                        responses: null, history: null, players: null, resetTrigger: false
-                    });
-                }, 1000);
+                console.log("重置訊號已送出");
+                // 這裡的 update 會順便把 resetTrigger 設回 false
+                db.ref('/').update({
+                    gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0, stats: null, timeLeft: 10 },
+                    responses: null,
+                    history: null,
+                    players: null,
+                    resetTrigger: false
+                });
             });
         }
     }
