@@ -8,7 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <style>
-        :root { --primary: #f39c12; --danger: #e74c3c; --success: #27ae60; --disabled: #555; }
+        :root { --primary: #f39c12; --danger: #e74c3c; --success: #27ae60; --disabled: #555; --max-hp: 20000; }
         body { background: #121212; color: white; font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; margin: 0; overflow-x: hidden; }
         .hidden { display: none !important; }
         
@@ -29,6 +29,18 @@
         }
         #boss-bubble::after { content: ''; position: absolute; left: -20px; top: 40%; border: 10px solid transparent; border-right-color: white; }
         @keyframes bubble-pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        /* 幸運女神祝福橫幅 */
+        #blessing-banner {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.5);
+            background: linear-gradient(135deg, #f1c40f, #f39c12); color: #fff;
+            padding: 40px; border-radius: 30px; font-size: 36px; font-weight: bold;
+            text-align: center; z-index: 3000; display: none; border: 8px solid white;
+            box-shadow: 0 0 100px gold; text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            width: 80%; max-width: 800px;
+        }
+        .blessing-active { display: block !important; animation: blessing-anim 3.5s forwards; }
+        @keyframes blessing-anim { 0% { opacity:0; transform: translate(-50%, -50%) scale(0.5); } 15% { opacity:1; transform: translate(-50%, -50%) scale(1.1); } 85% { opacity:1; transform: translate(-50%, -50%) scale(1); } 100% { opacity:0; transform: translate(-50%, -100%) scale(1); } }
 
         /* 動畫庫 */
         .shake { animation: heavy-shake 0.5s both; }
@@ -76,6 +88,12 @@
 <audio id="game-bgm" src="BGM.mp3" loop></audio>
 <audio id="victory-bgm" src="BGM_Victory.mp3"></audio>
 
+<div id="blessing-banner">
+    啟動幸運女神的祝福！<br>
+    <span style="font-size: 24px; color: #fff;">年終獎金翻倍，尾牙中獎機率提高</span><br>
+    <span style="font-size: 28px; color: #fff; font-weight: 900;">所有戰士受到鼓舞，給予怪物 5000 點傷害！</span>
+</div>
+
 <div id="name-overlay" class="hidden">
     <div style="display: flex; flex-direction: column; align-items: center; gap: 20px; width: 85%;">
         <h2 style="color: var(--primary); font-size: 32px; margin-bottom: 10px; text-shadow: 0 0 10px rgba(243,156,18,0.3);">🛡️ 戰士加入戰場 🛡️</h2>
@@ -110,13 +128,14 @@
     </div>
     
     <div id="boss-container">
-        <div id="boss-bubble"></div> <div id="dmg-text"></div>
+        <div id="boss-bubble"></div>
+        <div id="dmg-text"></div>
         <img id="boss-img" src="Boss_normal.png">
     </div>
 
     <div id="hp-wrapper">
         <div id="hp-bar"></div>
-        <div style="position: absolute; width:100%; top:0; line-height:45px; font-weight:900; font-size: 24px; text-shadow: 1px 1px 2px #000;">HP: <span id="hp-text">12000</span> / 12000</div>
+        <div style="position: absolute; width:100%; top:0; line-height:45px; font-weight:900; font-size: 24px; text-shadow: 1px 1px 2px #000;">HP: <span id="hp-text">20000</span> / 20000</div>
     </div>
 
     <div id="mvp-announcement" class="q-card hidden" style="border-color: gold;">
@@ -136,12 +155,19 @@
 <div id="admin-view" class="hidden" style="text-align: center; padding: 20px;">
     <h2>指揮官作戰面板</h2>
     <div id="admin-btns" style="background:#222; padding:20px; border-radius:15px; margin-bottom: 20px;"></div>
-    <button onclick="calculateResult()" style="background:var(--success); color:white; width:85%; padding:25px; font-size:32px; border:none; border-radius:15px; font-weight: bold; cursor: pointer;">💥 全員發動攻擊！</button>
-    <br><br><br>
+    <div style="display: flex; gap: 20px; justify-content: center;">
+        <button onclick="calculateResult()" style="background:var(--success); color:white; flex: 2; padding:25px; font-size:32px; border:none; border-radius:15px; font-weight: bold; cursor: pointer;">💥 全員發動攻擊！</button>
+        <button onclick="triggerBlessing()" style="background: linear-gradient(gold, orange); color:black; flex: 1; padding:25px; font-size:24px; border:none; border-radius:15px; font-weight: bold; cursor: pointer;">✨ 女神祝福</button>
+    </div>
+    <br><br>
     <button onclick="resetGame()" style="background:#c0392b; color:white; padding:12px 24px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場 (全體刷新)</button>
 </div>
 
 <script>
+    // 數值設定
+    const BOSS_MAX_HP = 20000;
+    const BASE_DAMAGE = 2500;
+
     const firebaseConfig = {
         apiKey: "AIzaSyDwwKME2_neH-VxZObTStJ_uRuJI_-C-tw",
         authDomain: "department-boss-battle.firebaseapp.com",
@@ -165,13 +191,7 @@
         10: { t: "CA小猴是誰?", o: {A:"Tiffiya", B:"Tiffant", C:"Tiffjia", D:"Tiffany"}, a: "D" }
     };
 
-    // 新增垃圾話陣列
-    const trashTalks = [
-        "你們的力量只有這樣嗎?",
-        "還敢自稱品質專業，這點攻擊像在刮痧!",
-        "打其他地方可以，打臉不行，我靠臉吃飯的",
-        "無知的人類，準備承受我的怒火吧"
-    ];
+    const trashTalks = ["你們的力量只有這樣嗎?", "還敢自稱品質專業，這點攻擊像在刮痧!", "打其他地方可以，打臉不行，我靠臉吃飯的", "無知的人類，準備承受我的怒火吧"];
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -181,10 +201,7 @@
     localStorage.setItem('game_uid', uid);
 
     db.ref('resetTrigger').on('value', snap => {
-        if (snap.val() === true && role !== 'admin') {
-            if(role === 'player') localStorage.removeItem('boss_player_name');
-            location.reload();
-        }
+        if (snap.val() === true && role !== 'admin') location.reload();
     });
 
     function saveName() {
@@ -208,10 +225,7 @@
             const total = snap.numChildren();
             const countEl = document.getElementById('vote-count');
             db.ref('gameState/status').once('value', sSnap => {
-                if(sSnap.val() !== 'answering') {
-                    countEl.innerText = `已集結戰士: ${total}`;
-                    countEl.style.color = "#888";
-                }
+                if(sSnap.val() !== 'answering') countEl.innerText = `已集結戰士: ${total}`;
             });
         });
     } else if(role === 'admin') {
@@ -231,7 +245,7 @@
     let currentGlobalTimeLeft = 10;
 
     db.ref('gameState').on('value', snap => {
-        const state = snap.val() || { hp: 12000, status: 'waiting' };
+        const state = snap.val() || { hp: BOSS_MAX_HP, status: 'waiting' };
         currentGlobalTimeLeft = state.timeLeft || 0;
         
         if (state.q !== lastQNum || state.status === 'answering') {
@@ -239,41 +253,33 @@
             lastQNum = state.q;
         }
 
-        if(role === 'display' && state.status === 'answering') {
-            Promise.all([db.ref('players').once('value'), db.ref('responses').once('value')]).then(results => {
-                const total = results[0].numChildren();
-                const answered = results[1].numChildren();
-                const countEl = document.getElementById('vote-count');
-                countEl.innerText = `任務進行中: ${answered} / ${total}`;
-                countEl.style.color = "#f1c40f";
-            });
-        }
-
-        const timerStr = state.timeLeft > 0 ? `⏳ ${state.timeLeft}s` : "⌛ 時間到！";
-        if(state.status === 'answering') {
-            if(role === 'display') document.getElementById('d-timer').innerText = timerStr;
-            if(role === 'player') document.getElementById('p-q-timer').innerText = timerStr;
-        } else {
-            if(role === 'display') document.getElementById('d-timer').innerText = "";
-        }
-
         if(role === 'display') {
             const bossImg = document.getElementById('boss-img');
             const hpBar = document.getElementById('hp-bar');
-            const bubble = document.getElementById('boss-bubble'); // 對話框
-            const hpPercent = (state.hp/12000*100);
+            const bubble = document.getElementById('boss-bubble');
+            const blessingBanner = document.getElementById('blessing-banner');
+            
+            if(state.showBlessing) {
+                blessingBanner.classList.add('blessing-active');
+                confetti({ particleCount: 150, colors: ['#ffd700', '#ffffff'], origin: {y: 0.3} });
+                if(role === 'display') setTimeout(() => db.ref('gameState/showBlessing').set(false), 3500);
+            } else {
+                blessingBanner.classList.remove('blessing-active');
+            }
+
+            const hpPercent = (state.hp/BOSS_MAX_HP*100);
             hpBar.style.width = hpPercent + "%";
             document.getElementById('hp-text').innerText = state.hp;
             if(hpPercent < 30) hpBar.classList.add('hp-low');
             else hpBar.classList.remove('hp-low');
 
             if(state.hp <= 0) {
-                bossImg.src = "Boss_hurt.png"; bossImg.style.transform = "scale(0) rotate(720deg)";
-                bubble.style.display = 'none'; // 死亡隱藏氣泡
+                bossImg.src = "Boss_hurt.png"; bossImg.style.transform = "scale(0)";
+                bubble.style.display = 'none';
                 confetti({ particleCount: 400, spread: 100, origin: { y: 0.6 } });
                 findMVP(); document.getElementById('round-num').innerText = "VICTORY!";
             } else {
-                bossImg.src = state.hp <= 6000 ? "Boss_angry.png" : "Boss_normal.png";
+                bossImg.src = state.hp <= (BOSS_MAX_HP/2) ? "Boss_angry.png" : "Boss_normal.png";
             }
 
             if(state.status === 'answering') {
@@ -284,48 +290,24 @@
                 document.getElementById('d-options').innerHTML = `<div>A: ${q.o.A}</div><div>B: ${q.o.B}</div><div>C: ${q.o.C}</div><div>D: ${q.o.D}</div>`;
                 document.getElementById('msg-box').innerHTML = "";
                 document.getElementById('round-num').innerText = "任務進行中...";
-                bubble.style.display = 'none'; // 開始作答隱藏氣泡
+                bubble.style.display = 'none';
+                document.getElementById('d-timer').innerText = `⏳ ${state.timeLeft}s`;
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
+                document.getElementById('d-timer').innerText = "";
                 if(state.lastDmg > 0) {
-                    const displayEl = document.getElementById('display-view');
                     const dmgText = document.getElementById('dmg-text');
-                    displayEl.classList.add('screen-shake', 'hurt-flash');
+                    document.getElementById('display-view').classList.add('screen-shake', 'hurt-flash');
                     bossImg.classList.add('shake');
                     dmgText.innerText = "-" + state.lastDmg;
-                    dmgText.style.fontSize = state.lastDmg > 1000 ? "130px" : "80px";
                     dmgText.classList.add('dmg-float');
-                    
-                    // 顯示垃圾話氣泡
-                    if(state.currentTrashTalk) {
-                        bubble.innerText = state.currentTrashTalk;
-                        bubble.style.display = 'block';
-                    }
-
+                    if(state.currentTrashTalk) { bubble.innerText = state.currentTrashTalk; bubble.style.display = 'block'; }
                     setTimeout(() => {
-                        displayEl.classList.remove('screen-shake', 'hurt-flash');
+                        document.getElementById('display-view').classList.remove('screen-shake', 'hurt-flash');
                         bossImg.classList.remove('shake');
                         dmgText.classList.remove('dmg-float');
                     }, 1200);
                 }
-                const stats = state.stats || { A:0, B:0, C:0, D:0 };
-                const total = (stats.A + stats.B + stats.C + stats.D) || 1;
-                const currentQ = questionBank[state.q];
-                document.getElementById('msg-box').innerHTML = `
-                    <div style="font-size: 38px; font-weight: bold; margin-bottom: 20px;">
-                        <div style="color: #2ecc71;">任務成功率：${state.correctRate}%</div>
-                        <div style="font-size: 55px; color: #e74c3c;">總傷害：${state.lastDmg}</div>
-                    </div>
-                    <div class="stat-container">
-                        ${['A','B','C','D'].map(opt => {
-                            const isAns = (currentQ.a === "ALL" || currentQ.a === opt);
-                            return `<div class="stat-row">
-                                <div class="stat-label ${isAns ? 'correct-text' : ''}">${opt}: ${currentQ.o[opt]} ${isAns ? '✅' : ''}</div>
-                                <div class="stat-bar-bg"><div class="stat-bar-fill ${isAns ? 'correct-fill' : ''}" style="width: ${(stats[opt]/total*100)}%"></div></div>
-                                <div class="stat-value">${stats[opt]} 人</div>
-                            </div>`;
-                        }).join('')}
-                    </div>`;
                 document.getElementById('round-num').innerText = "攻擊成功!";
             }
         }
@@ -338,7 +320,7 @@
                 document.getElementById('p-title').innerText = q.t;
                 document.getElementById('pa').innerText = q.o.A; document.getElementById('pb').innerText = q.o.B;
                 document.getElementById('pc').innerText = q.o.C; document.getElementById('pd').innerText = q.o.D;
-                if(state.timeLeft > 0) document.querySelectorAll('.q-btn').forEach(b => b.disabled = false);
+                document.getElementById('p-q-timer').innerText = `⏳ ${state.timeLeft}s`;
             } else {
                 document.getElementById('player-q-zone').classList.add('hidden');
                 document.getElementById('player-waiting').classList.remove('hidden');
@@ -347,63 +329,63 @@
         }
     });
 
-    let timerInterval = null;
+    function triggerBlessing() {
+        db.ref('gameState').once('value', snap => {
+            const state = snap.val();
+            const newHp = Math.max(0, state.hp - 5000);
+            db.ref('gameState').update({
+                hp: newHp,
+                lastDmg: 5000,
+                status: 'result',
+                showBlessing: true,
+                currentTrashTalk: "這...這股強大的氣運是怎麼回事！"
+            });
+        });
+    }
+
     function changeQ(num) {
-        clearInterval(timerInterval);
         db.ref('responses').remove();
-        const bossImg = document.getElementById('boss-img');
-        if(bossImg) {
-            bossImg.classList.remove('boss-spawn');
-            void bossImg.offsetWidth; 
-            bossImg.classList.add('boss-spawn');
-        }
         let timeLeft = 10;
-        db.ref('gameState').update({ q: num, status: 'answering', lastDmg: 0, stats: null, timeLeft: timeLeft, currentTrashTalk: "" });
-        timerInterval = setInterval(() => {
+        db.ref('gameState').update({ q: num, status: 'answering', lastDmg: 0, timeLeft: timeLeft, currentTrashTalk: "", showBlessing: false });
+        let timer = setInterval(() => {
             timeLeft--;
-            if(timeLeft <= 0) { clearInterval(timerInterval); db.ref('gameState/timeLeft').set(0); }
+            if(timeLeft <= 0) { clearInterval(timer); db.ref('gameState/timeLeft').set(0); }
             else db.ref('gameState/timeLeft').set(timeLeft);
         }, 1000);
     }
 
-    function submitAns(ans) {
-        hasSubmitted = true;
-        db.ref('responses/' + uid).set({ 
-            ans: ans, 
-            name: localStorage.getItem('boss_player_name'),
-            timeBonus: currentGlobalTimeLeft 
-        });
-    }
-
     function calculateResult() {
-        clearInterval(timerInterval);
         db.ref().once('value', snap => {
             const data = snap.val();
             const resps = data.responses || {};
-            const qNum = data.gameState.q;
-            const qData = questionBank[qNum];
-            if(Object.keys(resps).length === 0) return alert("還沒人集氣！");
-            db.ref('history').push({ qNum: qNum, players: resps });
+            const qData = questionBank[data.gameState.q];
             const players = Object.values(resps);
-            const stats = { A:0, B:0, C:0, D:0 };
-            players.forEach(p => { if(stats[p.ans] !== undefined) stats[p.ans]++; });
-            let correctCount = (qData.a === "ALL") ? players.length : players.filter(p => p.ans === qData.a).length;
-            let rate = Math.round((correctCount / players.length) * 100);
-            let dmg = Math.floor((rate / 100) * 1500);
-
-            // 隨機抽選垃圾話
-            const randomTalk = trashTalks[Math.floor(Math.random() * trashTalks.length)];
-
+            if(players.length === 0) return alert("還沒人集氣！");
+            
+            const correctCount = (qData.a === "ALL") ? players.length : players.filter(p => p.ans === qData.a).length;
+            const rate = correctCount / players.length; // 答對率 (0~1)
+            
+            // 計算傷害：基礎 2500 * 答對率
+            const dmg = Math.floor(BASE_DAMAGE * rate);
+            const rateDisplay = Math.round(rate * 100);
+            
+            const talk = trashTalks[Math.floor(Math.random() * trashTalks.length)];
+            
             db.ref('gameState').update({ 
                 status: 'result', 
                 hp: Math.max(0, data.gameState.hp - dmg), 
                 lastDmg: dmg, 
-                correctRate: rate, 
-                stats: stats, 
-                timeLeft: 0,
-                currentTrashTalk: randomTalk // 寫入資料庫
+                correctRate: rateDisplay, 
+                currentTrashTalk: talk, 
+                timeLeft: 0 
             });
+            db.ref('history').push({ qNum: data.gameState.q, players: resps });
         });
+    }
+
+    function submitAns(ans) {
+        hasSubmitted = true;
+        db.ref('responses/' + uid).set({ ans: ans, name: localStorage.getItem('boss_player_name'), timeBonus: currentGlobalTimeLeft });
     }
 
     function findMVP() {
@@ -412,37 +394,23 @@
             const scores = {}; 
             Object.values(history).forEach(round => {
                 const correctAns = questionBank[round.qNum].a;
-                if(!round.players) return;
-                Object.values(round.players).forEach(pData => {
-                    if(pData.name) {
-                        if(!scores[pData.name]) scores[pData.name] = { count: 0, totalTime: 0 };
-                        if(correctAns === "ALL" || pData.ans === correctAns) {
-                            scores[pData.name].count += 1;
-                            scores[pData.name].totalTime += (pData.timeBonus || 0);
-                        }
-                    }
+                Object.values(round.players).forEach(p => {
+                    if(!scores[p.name]) scores[p.name] = { count: 0, time: 0 };
+                    if(correctAns === "ALL" || p.ans === correctAns) { scores[p.name].count++; scores[p.name].time += p.timeBonus; }
                 });
             });
-            const sorted = Object.entries(scores).sort((a,b) => (b[1].count !== a[1].count) ? b[1].count - a[1].count : b[1].totalTime - a[1].totalTime);
+            const sorted = Object.entries(scores).sort((a,b) => b[1].count - a[1].count);
             document.getElementById('mvp-announcement').classList.remove('hidden');
-            document.getElementById('mvp-list').innerHTML = sorted.slice(0, 8).map((p, i) => {
-                let icon = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : "🎖️"));
-                return `<div style="margin:10px 0; display:flex; justify-content:space-between; padding:0 30px;">
-                    <span>${icon} <span style="color:white">${p[0]}</span></span>
-                    <span style="color:var(--primary)">${p[1].count} 任務完成 (${p[1].totalTime}s)</span>
-                </div>`;
-            }).join('');
+            document.getElementById('mvp-list').innerHTML = sorted.slice(0, 8).map((p, i) => `<div style="margin:10px 0; display:flex; justify-content:space-between; padding:0 30px;"><span>${p[0]}</span><span style="color:var(--primary)">${p[1].count} 回合</span></div>`).join('');
         });
     }
 
     function resetGame() {
-        if(confirm("⚠ 注意：這將會清空所有數據並重置戰場。確定嗎？")) {
-            clearInterval(timerInterval);
-            db.ref('/').update({
-                gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0, stats: null, timeLeft: 10, currentTrashTalk: "" },
-                responses: null, history: null, players: null, resetTrigger: false 
-            }).then(() => db.ref('resetTrigger').set(true))
-            .then(() => setTimeout(() => { db.ref('resetTrigger').set(false); alert("戰場已完成初始化！"); }, 1500));
+        if(confirm("確定重置戰場？(HP將回到20000)")) {
+            db.ref('/').set({
+                gameState: { q:0, status:'waiting', hp: BOSS_MAX_HP, lastDmg: 0, timeLeft: 10, showBlessing: false },
+                resetTrigger: true
+            }).then(() => setTimeout(() => db.ref('resetTrigger').set(false), 1000));
         }
     }
 </script>
