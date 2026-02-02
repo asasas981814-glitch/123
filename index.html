@@ -16,7 +16,7 @@
         .hurt-flash { background: rgba(231, 76, 60, 0.5) !important; }
         
         #boss-container { position: relative; display: inline-block; margin: 40px auto; min-height: 320px; }
-        #boss-img { width: 320px; transition: all 0.4s; filter: drop-shadow(0 0 20px rgba(255,255,255,0.2)); }
+        #boss-img { width: 320px; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); filter: drop-shadow(0 0 20px rgba(255,255,255,0.2)); }
         
         #boss-bubble {
             position: absolute; top: -10px; right: -160px; background: white; color: black; 
@@ -29,24 +29,22 @@
 
         .shake { animation: heavy-shake 0.5s both; }
         @keyframes heavy-shake { 0%, 100% {transform: translateX(0);} 20% {transform: translateX(-15px) rotate(-5deg);} 40% {transform: translateX(15px) rotate(5deg);} 60% {transform: translateX(-15px) rotate(-5deg);} 80% {transform: translateX(15px) rotate(5deg);} }
-        .screen-shake { animation: screen-shake-anim 0.4s both; }
+        .screen-shake { animation: screen-shake-anim 0.4s cubic-bezier(.36,.07,.19,.97) both; }
         @keyframes screen-shake-anim { 10%, 90% { transform: translate3d(-4px, 0, 0); } 20%, 80% { transform: translate3d(6px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-10px, 0, 0); } 40%, 60% { transform: translate3d(10px, 0, 0); } }
 
-        #hp-wrapper { width: 85%; background: #222; height: 45px; border: 4px solid #fff; margin: 20px auto; border-radius: 25px; overflow: hidden; position: relative; }
+        #hp-wrapper { width: 85%; background: #222; height: 45px; border: 4px solid #fff; margin: 20px auto; border-radius: 25px; overflow: hidden; position: relative; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
         #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff416c, #ff4b2b); transition: width 0.8s ease-out; }
 
-        #dmg-text { position: absolute; top: -40px; left: 50%; transform: translateX(-50%); font-size: 80px; font-weight: 900; color: #ff3e3e; opacity: 0; pointer-events: none; z-index: 100; text-shadow: 4px 4px 0 #000; }
+        #dmg-text { position: absolute; top: -40px; left: 50%; transform: translateX(-50%); font-size: 80px; font-weight: 900; color: #ff3e3e; opacity: 0; pointer-events: none; z-index: 100; text-shadow: 4px 4px 0 #000, 0 0 20px #fff; }
         .dmg-float { animation: float-up 1.2s forwards; }
         @keyframes float-up { 0% { opacity: 1; transform: translate(-50%, 0) scale(0.8); } 50% { transform: translate(-50%, -60px) scale(1.3); } 100% { opacity: 0; transform: translate(-50%, -120px) scale(1); } }
 
-        .q-card { background: rgba(0,0,0,0.9); padding: 30px; border-radius: 20px; margin: 20px auto; max-width: 900px; border: 3px solid var(--primary); }
+        .q-card { background: rgba(0,0,0,0.9); padding: 30px; border-radius: 20px; margin: 20px auto; max-width: 900px; border: 3px solid var(--primary); box-shadow: 0 0 30px rgba(243, 156, 18, 0.4); }
         .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; font-size: 28px; text-align: left; }
-        .stat-bar-bg { flex-grow: 1; background: #333; height: 24px; border-radius: 12px; margin: 0 15px; overflow: hidden; }
-        .stat-bar-fill { height: 100%; background: #777; transition: width 1s ease-out; }
-        .correct-fill { background: var(--success) !important; }
-
-        .player-btn { background: linear-gradient(145deg, #f39c12, #e67e22); color: white; border: none; padding: 20px; font-size: 24px; border-radius: 20px; font-weight: bold; width: 100%; cursor: pointer; box-shadow: 0 5px #d35400; }
-        .player-btn:disabled { background: #555; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
+        
+        .player-btn { background: linear-gradient(145deg, #f39c12, #e67e22); color: white; border: none; padding: 20px; font-size: 24px; border-radius: 20px; font-weight: bold; width: 100%; cursor: pointer; box-shadow: 0 5px #d35400; transition: all 0.2s; }
+        .player-btn:active { transform: translateY(3px); box-shadow: 0 2px #d35400; }
+        .player-btn:disabled { background: #555 !important; box-shadow: none !important; cursor: not-allowed; opacity: 0.6; }
         #name-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
     </style>
 </head>
@@ -80,22 +78,27 @@
 </div>
 
 <div id="display-view" class="hidden">
+    <button id="bgm-control" onclick="toggleBGM()" style="position:fixed; bottom:20px; right:20px; padding:10px; z-index:1000;">🎵 啟動音效</button>
     <div style="display: flex; justify-content: center; align-items: center; gap: 30px;">
         <h1 id="round-num" style="font-size: 55px; color: var(--primary);">READY?</h1>
         <div id="d-timer" style="font-size: 55px; font-weight: bold; color: #e74c3c;"></div>
     </div>
+    
     <div id="boss-container">
         <div id="boss-bubble"></div> <div id="dmg-text"></div>
         <img id="boss-img" src="Boss_normal.png">
     </div>
+
     <div id="hp-wrapper">
         <div id="hp-bar"></div>
         <div style="position: absolute; width:100%; top:0; line-height:45px; font-weight:900; font-size: 24px;">HP: <span id="hp-text">10000</span> / 10000</div>
     </div>
+
     <div id="display-q-box" class="q-card hidden">
         <h2 id="d-title" style="font-size: 40px;"></h2>
         <div class="option-grid" id="d-options"></div>
     </div>
+
     <div id="msg-box" style="margin-top: 20px;"></div>
     <div id="vote-count" style="color: #f1c40f; font-size: 28px; font-weight: bold;">已集結戰士: 0</div>
 </div>
@@ -105,7 +108,7 @@
     <div id="admin-btns" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 20px;"></div>
     <button onclick="calculateResult()" style="background:var(--success); color:white; width:85%; padding:25px; font-size:32px; border-radius:15px; border:none; font-weight: bold; cursor: pointer;">💥 全員發動攻擊！</button>
     <br><br>
-    <button onclick="resetGame()" style="background:#c0392b; color:white; padding:10px 20px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場</button>
+    <button onclick="resetGame()" style="background:#c0392b; color:white; padding:10px 20px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場 (全體刷新)</button>
 </div>
 
 <script>
@@ -146,6 +149,13 @@
     const uid = localStorage.getItem('game_uid') || Math.random().toString(36).substring(7);
     localStorage.setItem('game_uid', uid);
 
+    db.ref('resetTrigger').on('value', snap => {
+        if (snap.val() === true) {
+            if(role === 'player') localStorage.removeItem('boss_player_name');
+            location.reload();
+        }
+    });
+
     function saveName() {
         const name = document.getElementById('player-name-input').value.trim();
         if(!name) return alert("請輸入名字！");
@@ -166,7 +176,7 @@
     } else if(role === 'admin') {
         document.getElementById('admin-view').classList.remove('hidden');
         const container = document.getElementById('admin-btns');
-        for(let i=1; i<=15; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="padding:15px; width:60px; background:#444; color:white; border-radius:10px;">${i}</button>`;
+        for(let i=1; i<=15; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="padding:15px; width:80px; background:#444; color:white; border-radius:10px; cursor:pointer;">${i}</button>`;
     }
 
     let hasSubmitted = false;
@@ -176,12 +186,15 @@
     db.ref('gameState').on('value', snap => {
         const state = snap.val() || { hp: BOSS_MAX_HP, status: 'waiting', q: 0 };
         
-        // 問題切換檢測：如果任務編號變了，重置作答狀態
+        // 【修正】新任務發布時，重置所有 Player 狀態
         if (state.q !== currentQNum) {
             hasSubmitted = false;
             currentQNum = state.q;
             if (role === 'player') {
-                document.querySelectorAll('.q-btn').forEach(btn => btn.disabled = false);
+                document.querySelectorAll('.q-btn').forEach(btn => {
+                    btn.disabled = false;
+                    btn.style.opacity = "1";
+                });
             }
         }
 
@@ -189,7 +202,7 @@
 
         if(role === 'display') {
             document.getElementById('d-timer').innerText = state.status === 'answering' ? timerStr : "";
-            document.getElementById('hp-bar').style.width = (state.hp/BOSS_MAX_HP*100) + "%";
+            document.getElementById('hp-bar').style.width = (state.hp / BOSS_MAX_HP * 100) + "%";
             document.getElementById('hp-text').innerText = state.hp;
             
             // 實時人數顯示
@@ -227,7 +240,6 @@
                 document.getElementById('pc').innerText = q.o.C; document.getElementById('pd').innerText = q.o.D;
                 document.getElementById('p-q-timer').innerText = timerStr;
                 
-                // 時間到點反灰按鈕
                 if(state.timeLeft <= 0) {
                     document.querySelectorAll('.q-btn').forEach(btn => btn.disabled = true);
                 }
@@ -250,20 +262,11 @@
             dmgText.classList.add('dmg-float');
             document.getElementById('display-view').classList.add('screen-shake', 'hurt-flash');
             document.getElementById('boss-img').classList.add('shake');
-            document.getElementById('boss-bubble').innerText = state.currentTrashTalk || "可惡...";
-            document.getElementById('boss-bubble').style.display = 'block';
             setTimeout(() => {
                 document.getElementById('display-view').classList.remove('screen-shake', 'hurt-flash');
                 document.getElementById('boss-img').classList.remove('shake');
             }, 1000);
         }
-        showStats(state);
-    }
-
-    function showStats(state) {
-        const stats = state.stats || { A:0, B:0, C:0, D:0 };
-        const total = (stats.A + stats.B + stats.C + stats.D) || 1;
-        const currentQ = questionBank[state.q];
         document.getElementById('msg-box').innerHTML = `
             <div style="font-size: 38px; font-weight: bold; margin-bottom: 20px;">
                 <div style="color: #2ecc71;">任務成功率：${state.correctRate}%</div>
@@ -287,8 +290,7 @@
         db.ref('gameState/timeLeft').once('value', snap => {
             db.ref('responses/' + uid).set({ 
                 ans: ans, 
-                name: localStorage.getItem('boss_player_name'),
-                timeBonus: snap.val() || 0 
+                name: localStorage.getItem('boss_player_name')
             });
         });
     }
@@ -300,29 +302,39 @@
             const qData = questionBank[data.gameState.q];
             const players = Object.values(resps);
             if(!players.length) return alert("沒人回答！");
-            const stats = { A:0, B:0, C:0, D:0 };
-            players.forEach(p => stats[p.ans]++);
+
             const correctCount = players.filter(p => qData.a.includes(p.ans)).length;
-            const rate = Math.round((correctCount / players.length) * 100);
-            const dmg = Math.floor((rate / 100) * BASE_DAMAGE);
+            const rate = correctCount / players.length; 
+            const dmg = Math.floor(rate * BASE_DAMAGE); // 基礎傷害 1000
+
             db.ref('gameState').update({ 
                 status: 'result', 
                 hp: Math.max(0, data.gameState.hp - dmg), 
                 lastDmg: dmg, 
-                correctRate: rate, 
-                stats: stats,
+                correctRate: Math.round(rate * 100), 
                 resId: "res-" + Date.now()
             });
         });
     }
 
     function resetGame() {
-        if(confirm("重置戰場？")) {
+        if(confirm("重置戰場？此動作會清空所有玩家名字並刷新頁面。")) {
             db.ref('/').set({
-                gameState: { q:0, status:'waiting', hp:BOSS_MAX_HP, timeLeft: 10, resId: "" },
-                players: null, responses: null, resetTrigger: true
-            }).then(() => location.reload());
+                gameState: { q:0, status:'waiting', hp: BOSS_MAX_HP, timeLeft: 10, resId: "", lastDmg: 0 },
+                players: null, 
+                responses: null, 
+                resetTrigger: true
+            }).then(() => {
+                db.ref('resetTrigger').set(false);
+                location.reload();
+            });
         }
+    }
+
+    function toggleBGM() {
+        const bgm = document.getElementById('game-bgm');
+        if (bgm.paused) { bgm.play(); document.getElementById('bgm-control').innerText = "⏸ 暫停"; }
+        else { bgm.pause(); document.getElementById('bgm-control').innerText = "▶ 播放"; }
     }
 </script>
 </body>
