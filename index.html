@@ -33,19 +33,14 @@
         /* 動畫庫 */
         .shake { animation: heavy-shake 0.5s both; }
         @keyframes heavy-shake { 0%, 100% {transform: translateX(0);} 20% {transform: translateX(-15px) rotate(-5deg);} 40% {transform: translateX(15px) rotate(5deg);} 60% {transform: translateX(-15px) rotate(-5deg);} 80% {transform: translateX(15px) rotate(5deg);} }
-        
         .screen-shake { animation: screen-shake-anim 0.4s cubic-bezier(.36,.07,.19,.97) both; }
         @keyframes screen-shake-anim { 10%, 90% { transform: translate3d(-4px, 0, 0); } 20%, 80% { transform: translate3d(6px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-10px, 0, 0); } 40%, 60% { transform: translate3d(10px, 0, 0); } }
-
         .boss-spawn { animation: spawn-glow 0.8s ease-out; }
         @keyframes spawn-glow { 0% { filter: brightness(5); transform: scale(0.3); opacity: 0; } 100% { filter: brightness(1); transform: scale(1); opacity: 1; } }
 
         /* 血條與傷害數字 */
         #hp-wrapper { width: 85%; background: #222; height: 45px; border: 4px solid #fff; margin: 20px auto; border-radius: 25px; overflow: hidden; position: relative; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
         #hp-bar { width: 100%; height: 100%; background: linear-gradient(90deg, #ff416c, #ff4b2b); transition: width 1s ease-out; }
-        .hp-low { animation: hp-pulse 1s infinite; }
-        @keyframes hp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
-
         #dmg-text { position: absolute; top: -40px; left: 50%; transform: translateX(-50%); font-size: 80px; font-weight: 900; color: #ff3e3e; opacity: 0; pointer-events: none; z-index: 100; text-shadow: 4px 4px 0 #000, 0 0 20px #fff; -webkit-text-stroke: 2px white; }
         .dmg-float { animation: float-up 1.2s forwards; }
         @keyframes float-up { 0% { opacity: 1; transform: translate(-50%, 0) scale(0.8); } 50% { transform: translate(-50%, -60px) scale(1.3); } 100% { opacity: 0; transform: translate(-50%, -120px) scale(1); } }
@@ -61,20 +56,15 @@
         .correct-fill { background: var(--success) !important; box-shadow: 0 0 15px var(--success); }
         .correct-text { color: var(--success) !important; font-weight: 900; }
 
-        /* 介面遮罩 (加入戰場) */
         #name-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-
-        /* 按鈕樣式 */
         .player-btn { background: linear-gradient(145deg, #f39c12, #e67e22); color: white; border: none; padding: 20px; font-size: 24px; border-radius: 20px; font-weight: bold; width: 100%; cursor: pointer; box-shadow: 0 5px #d35400; transition: 0.2s; }
         .player-btn:active { transform: translateY(3px); box-shadow: 0 2px #d35400; }
-        .player-btn:disabled { background: #555; box-shadow: none; transform: translateY(5px); cursor: not-allowed; }
         #bgm-control { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.7); color: white; border: 1px solid #555; padding: 12px; border-radius: 10px; z-index: 1000; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <audio id="game-bgm" src="BGM.mp3" loop></audio>
-<audio id="victory-bgm" src="BGM_Victory.mp3"></audio>
 
 <div id="name-overlay" class="hidden">
     <div style="display: flex; flex-direction: column; align-items: center; gap: 20px; width: 85%;">
@@ -116,7 +106,7 @@
 
     <div id="hp-wrapper">
         <div id="hp-bar"></div>
-        <div style="position: absolute; width:100%; top:0; line-height:45px; font-weight:900; font-size: 24px; text-shadow: 1px 1px 2px #000;">HP: <span id="hp-text">12000</span> / 12000</div>
+        <div style="position: absolute; width:100%; top:0; line-height:45px; font-weight:900; font-size: 24px; text-shadow: 1px 1px 2px #000;">HP: <span id="hp-text">15000</span> / 15000</div>
     </div>
 
     <div id="mvp-announcement" class="q-card hidden" style="border-color: gold;">
@@ -135,13 +125,14 @@
 
 <div id="admin-view" class="hidden" style="text-align: center; padding: 20px;">
     <h2>指揮官作戰面板</h2>
-    <div id="admin-btns" style="background:#222; padding:20px; border-radius:15px; margin-bottom: 20px;"></div>
+    <div id="admin-btns" style="background:#222; padding:20px; border-radius:15px; margin-bottom: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;"></div>
     <button onclick="calculateResult()" style="background:var(--success); color:white; width:85%; padding:25px; font-size:32px; border:none; border-radius:15px; font-weight: bold; cursor: pointer;">💥 全員發動攻擊！</button>
     <br><br><br>
     <button onclick="resetGame()" style="background:#c0392b; color:white; padding:12px 24px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場 (全體刷新)</button>
 </div>
 
 <script>
+    const BOSS_MAX_HP = 15000;
     const firebaseConfig = {
         apiKey: "AIzaSyDwwKME2_neH-VxZObTStJ_uRuJI_-C-tw",
         authDomain: "department-boss-battle.firebaseapp.com",
@@ -153,25 +144,24 @@
     };
 
     const questionBank = {
-        1: { t: "請問今天的主持人帥嗎?", o: {A:"帥", B:"很帥", C:"超帥", D:"特別帥"}, a: "ALL" },
-        2: { t: "Moxa在哪裡?", o: {A:"板橋", B:"新莊", C:"中和", D:"永和"}, a: "B" },
-        3: { t: "我們是甚麼股份有限公司?", o: {A:"101", B:"202", C:"303", D:"404"}, a: "D" },
-        4: { t: "CE全稱?", o: {A:"Common Era", B:"Civil Engineer", C:"Component Engineer", D:"Computer Engineer"}, a: "C" },
-        5: { t: "今年強調的主題是?", o: {A:"協作", B:"協力車", C:"孫協志", D:"協協協"}, a: "A" },
-        6: { t: "CA最扛的男人是誰?", o: {A:"Boozer", B:"Booger", C:"Booder", D:"Booker"}, a: "A" },
-        7: { t: "CE天才畫手是誰?", o: {A:"Daneil", B:"Dennis", C:"Demmis", D:"Deccis"}, a: "B" },
-        8: { t: "CA謠言製造者是誰?", o: {A:"Naoh", B:"Nhao", C:"Noah", D:"Noha"}, a: "C" },
-        9: { t: "CA之母是誰?", o: {A:"Lica", B:"Lisa", C:"Liya", D:"Liwa"}, a: "B" },
-        10: { t: "CA小猴是誰?", o: {A:"Tiffiya", B:"Tiffant", C:"Tiffjia", D:"Tiffany"}, a: "D" }
+        1: { t: "今天QMD Kick Off 的主持人帥嗎?", o: {A:"宇宙帥", B:"太陽系帥", C:"銀河系帥", D:"阿格力"}, a: "ABC" },
+        2: { t: "今年QMD Kick Off想要表達的主題為何?", o: {A:"Collaborating Forward Executing Together", B:"協做前行，齊心致遠", C:"一個人走的快，一群人走得遠", D:"以上皆是"}, a: "D" },
+        3: { t: "下列何者不是CMC對於E2E料件管理的三大重點?", o: {A:"發展料區管理", B:"回應外部議題", C:"發展風險維度", D:"以成本當作優先評估重點"}, a: "D" },
+        4: { t: "何者不是PPAP的核心重點?", o: {A:"規格制訂&落地執行", B:"異常處理&問題解析", C:"策略執行&品質提升", D:"筆&鳳梨&蘋果"}, a: "D" },
+        5: { t: "何者不是電子與模組料區小組在2026年的重點工作?", o: {A:"DRAM & Main chip封裝產能衝擊對應", B:"鑽研AI硬體應用趨勢", C:"透過PFMEA水平展開提升板廠工程能力", D:"落實 Power 選料原則，推行單體驗證"}, a: "B" },
+        6: { t: "下列何者不是DQA 2026的三大核心轉型?", o: {A:"效率革命", B:"價值提升", C:"組織重組", D:"增購設備"}, a: "D" },
+        7: { t: "TK的精美報告是使用了下列哪個AI平台輔助製作?", o: {A:"Grok", B:"ChatGPT", C:"NotebookLM", D:"Perplexity"}, a: "D" },
+        8: { t: "DPQM的關鍵任務-數位化轉型是自動化產出下列何者報告?", o: {A:"測試報告與MTBF報告", B:"DFEMA", C:"8D報告", D:"PFEMA報告"}, a: "A" },
+        9: { t: "Which is not one of the Strategies Pillars of PRCM?", o: {A:"Enhance Sustaining", B:"Better Service for Customer", C:"Build up Engineering Knowledge", D:"Pneumonoultra...volcanoconiosis"}, a: "D" },
+        10: { t: "Where the Knowledge Management of PRCM is?", o: {A:"GeDCC", B:"PDM", C:"PRCM Portal", D:"Moxa College"}, a: "C" },
+        11: { t: "Which of the following is not Hard Skill of PRCM?", o: {A:"EMC&RF", B:"Safty&Hazloc", C:"Energy&Haz Substances", D:"Ontology&Epistemology"}, a: "D" },
+        12: { t: "品質與可靠度白皮書預計甚麼時候正式發布?", o: {A:"2026Q4", B:"已經完成正式發佈", C:"2027Q3", D:"2027Q2"}, a: "A" },
+        13: { t: "何者不是2025年的可靠度專案?", o: {A:"Nport 6150 Reliability", B:"Thin Gold Plated Contacts Effect", C:"PCB Supplier EISO enhancement", D:"Solder joint 20Y Reliability Test"}, a: "B" },
+        14: { t: "何者不是QRM 2026的測試與驗證計畫?", o: {A:"Conformal Coating BGA 應力影響", B:"薄金鍍層接觸影響", C:"壓電材料散熱可靠度", D:"產品PEL：電解電容驗證"}, a: "B" },
+        15: { t: "哪位同仁連續幾年參與表演，今年也會閃亮登台?", o: {A:"Jerry", B:"Lisa", C:"Boozer", D:"Dennis"}, a: "A" }
     };
 
-    // 新增垃圾話陣列
-    const trashTalks = [
-        "你們的力量只有這樣嗎?",
-        "還敢自稱品質專業，這點攻擊像在刮痧!",
-        "打其他地方可以，打臉不行，我靠臉吃飯的",
-        "無知的人類，準備承受我的怒火吧"
-    ];
+    const trashTalks = ["你們的力量只有這樣嗎?", "還敢自稱品質專業，這點攻擊像在刮痧!", "打其他地方可以，打臉不行！", "無知的人類，準備承受我的怒火吧"];
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
@@ -182,7 +172,7 @@
 
     db.ref('resetTrigger').on('value', snap => {
         if (snap.val() === true && role !== 'admin') {
-            if(role === 'player') localStorage.removeItem('boss_player_name');
+            localStorage.removeItem('boss_player_name');
             location.reload();
         }
     });
@@ -204,20 +194,10 @@
         }
     } else if(role === 'display') {
         document.getElementById('display-view').classList.remove('hidden');
-        db.ref('players').on('value', snap => {
-            const total = snap.numChildren();
-            const countEl = document.getElementById('vote-count');
-            db.ref('gameState/status').once('value', sSnap => {
-                if(sSnap.val() !== 'answering') {
-                    countEl.innerText = `已集結戰士: ${total}`;
-                    countEl.style.color = "#888";
-                }
-            });
-        });
     } else if(role === 'admin') {
         document.getElementById('admin-view').classList.remove('hidden');
         const container = document.getElementById('admin-btns');
-        for(let i=1; i<=10; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="margin:5px; padding:10px; cursor:pointer; width:80px;">任務 ${i}</button>`;
+        for(let i=1; i<=15; i++) container.innerHTML += `<button onclick="changeQ(${i})" style="margin:5px; padding:15px; cursor:pointer; width:80px; background:#444; color:white; border:1px solid #666; border-radius:10px;">任務 ${i}</button>`;
     }
 
     function toggleBGM() {
@@ -231,7 +211,7 @@
     let currentGlobalTimeLeft = 10;
 
     db.ref('gameState').on('value', snap => {
-        const state = snap.val() || { hp: 12000, status: 'waiting' };
+        const state = snap.val() || { hp: BOSS_MAX_HP, status: 'waiting' };
         currentGlobalTimeLeft = state.timeLeft || 0;
         
         if (state.q !== lastQNum || state.status === 'answering') {
@@ -239,129 +219,103 @@
             lastQNum = state.q;
         }
 
-        if(role === 'display' && state.status === 'answering') {
-            Promise.all([db.ref('players').once('value'), db.ref('responses').once('value')]).then(results => {
-                const total = results[0].numChildren();
-                const answered = results[1].numChildren();
-                const countEl = document.getElementById('vote-count');
-                countEl.innerText = `任務進行中: ${answered} / ${total}`;
-                countEl.style.color = "#f1c40f";
-            });
-        }
-
-        const timerStr = state.timeLeft > 0 ? `⏳ ${state.timeLeft}s` : "⌛ 時間到！";
-        if(state.status === 'answering') {
-            if(role === 'display') document.getElementById('d-timer').innerText = timerStr;
-            if(role === 'player') document.getElementById('p-q-timer').innerText = timerStr;
-        } else {
-            if(role === 'display') document.getElementById('d-timer').innerText = "";
-        }
-
         if(role === 'display') {
-            const bossImg = document.getElementById('boss-img');
-            const hpBar = document.getElementById('hp-bar');
-            const bubble = document.getElementById('boss-bubble'); // 對話框
-            const hpPercent = (state.hp/12000*100);
-            hpBar.style.width = hpPercent + "%";
-            document.getElementById('hp-text').innerText = state.hp;
-            if(hpPercent < 30) hpBar.classList.add('hp-low');
-            else hpBar.classList.remove('hp-low');
-
-            if(state.hp <= 0) {
-                bossImg.src = "Boss_hurt.png"; bossImg.style.transform = "scale(0) rotate(720deg)";
-                bubble.style.display = 'none'; // 死亡隱藏氣泡
-                confetti({ particleCount: 400, spread: 100, origin: { y: 0.6 } });
-                findMVP(); document.getElementById('round-num').innerText = "VICTORY!";
-            } else {
-                bossImg.src = state.hp <= 6000 ? "Boss_angry.png" : "Boss_normal.png";
-            }
-
-            if(state.status === 'answering') {
-                const q = questionBank[state.q];
-                document.getElementById('display-q-box').classList.remove('hidden');
-                document.getElementById('mvp-announcement').classList.add('hidden');
-                document.getElementById('d-title').innerText = q.t;
-                document.getElementById('d-options').innerHTML = `<div>A: ${q.o.A}</div><div>B: ${q.o.B}</div><div>C: ${q.o.C}</div><div>D: ${q.o.D}</div>`;
-                document.getElementById('msg-box').innerHTML = "";
-                document.getElementById('round-num').innerText = "任務進行中...";
-                bubble.style.display = 'none'; // 開始作答隱藏氣泡
-            } else if(state.status === 'result') {
-                document.getElementById('display-q-box').classList.add('hidden');
-                if(state.lastDmg > 0) {
-                    const displayEl = document.getElementById('display-view');
-                    const dmgText = document.getElementById('dmg-text');
-                    displayEl.classList.add('screen-shake', 'hurt-flash');
-                    bossImg.classList.add('shake');
-                    dmgText.innerText = "-" + state.lastDmg;
-                    dmgText.style.fontSize = state.lastDmg > 1000 ? "130px" : "80px";
-                    dmgText.classList.add('dmg-float');
-                    
-                    // 顯示垃圾話氣泡
-                    if(state.currentTrashTalk) {
-                        bubble.innerText = state.currentTrashTalk;
-                        bubble.style.display = 'block';
-                    }
-
-                    setTimeout(() => {
-                        displayEl.classList.remove('screen-shake', 'hurt-flash');
-                        bossImg.classList.remove('shake');
-                        dmgText.classList.remove('dmg-float');
-                    }, 1200);
-                }
-                const stats = state.stats || { A:0, B:0, C:0, D:0 };
-                const total = (stats.A + stats.B + stats.C + stats.D) || 1;
-                const currentQ = questionBank[state.q];
-                document.getElementById('msg-box').innerHTML = `
-                    <div style="font-size: 38px; font-weight: bold; margin-bottom: 20px;">
-                        <div style="color: #2ecc71;">任務成功率：${state.correctRate}%</div>
-                        <div style="font-size: 55px; color: #e74c3c;">總傷害：${state.lastDmg}</div>
-                    </div>
-                    <div class="stat-container">
-                        ${['A','B','C','D'].map(opt => {
-                            const isAns = (currentQ.a === "ALL" || currentQ.a === opt);
-                            return `<div class="stat-row">
-                                <div class="stat-label ${isAns ? 'correct-text' : ''}">${opt}: ${currentQ.o[opt]} ${isAns ? '✅' : ''}</div>
-                                <div class="stat-bar-bg"><div class="stat-bar-fill ${isAns ? 'correct-fill' : ''}" style="width: ${(stats[opt]/total*100)}%"></div></div>
-                                <div class="stat-value">${stats[opt]} 人</div>
-                            </div>`;
-                        }).join('')}
-                    </div>`;
-                document.getElementById('round-num').innerText = "攻擊成功!";
-            }
-        }
-
-        if(role === 'player') {
-            const q = questionBank[state.q];
-            if(state.status === 'answering' && !hasSubmitted) {
-                document.getElementById('player-waiting').classList.add('hidden');
-                document.getElementById('player-q-zone').classList.remove('hidden');
-                document.getElementById('p-title').innerText = q.t;
-                document.getElementById('pa').innerText = q.o.A; document.getElementById('pb').innerText = q.o.B;
-                document.getElementById('pc').innerText = q.o.C; document.getElementById('pd').innerText = q.o.D;
-                if(state.timeLeft > 0) document.querySelectorAll('.q-btn').forEach(b => b.disabled = false);
-            } else {
-                document.getElementById('player-q-zone').classList.add('hidden');
-                document.getElementById('player-waiting').classList.remove('hidden');
-                document.getElementById('wait-msg').innerText = hasSubmitted ? "任務完成，準備攻擊！💥" : "等待指揮官發布任務...";
-            }
+            updateDisplay(state);
+        } else if(role === 'player') {
+            updatePlayer(state);
         }
     });
 
-    let timerInterval = null;
-    function changeQ(num) {
-        clearInterval(timerInterval);
-        db.ref('responses').remove();
+    function updateDisplay(state) {
         const bossImg = document.getElementById('boss-img');
-        if(bossImg) {
-            bossImg.classList.remove('boss-spawn');
-            void bossImg.offsetWidth; 
-            bossImg.classList.add('boss-spawn');
+        const hpBar = document.getElementById('hp-bar');
+        const bubble = document.getElementById('boss-bubble');
+        const hpPercent = (state.hp/BOSS_MAX_HP*100);
+        
+        hpBar.style.width = hpPercent + "%";
+        document.getElementById('hp-text').innerText = state.hp;
+        
+        const timerStr = state.timeLeft > 0 ? `⏳ ${state.timeLeft}s` : "⌛ 時間到！";
+        document.getElementById('d-timer').innerText = state.status === 'answering' ? timerStr : "";
+
+        if(state.hp <= 0) {
+            bossImg.style.transform = "scale(0) rotate(720deg)";
+            bubble.style.display = 'none';
+            confetti({ particleCount: 300, spread: 80, origin: { y: 0.6 } });
+            findMVP(); 
+            document.getElementById('round-num').innerText = "MISSION CLEAR!";
         }
+
+        if(state.status === 'answering') {
+            const q = questionBank[state.q];
+            document.getElementById('display-q-box').classList.remove('hidden');
+            document.getElementById('mvp-announcement').classList.add('hidden');
+            document.getElementById('d-title').innerText = q.t;
+            document.getElementById('d-options').innerHTML = `<div>A: ${q.o.A}</div><div>B: ${q.o.B}</div><div>C: ${q.o.C}</div><div>D: ${q.o.D}</div>`;
+            document.getElementById('msg-box').innerHTML = "";
+            document.getElementById('round-num').innerText = "任務進行中...";
+            bubble.style.display = 'none';
+        } else if(state.status === 'result') {
+            document.getElementById('display-q-box').classList.add('hidden');
+            if(state.lastDmg > 0) {
+                const dmgText = document.getElementById('dmg-text');
+                dmgText.innerText = "-" + state.lastDmg;
+                dmgText.classList.add('dmg-float');
+                document.getElementById('display-view').classList.add('screen-shake', 'hurt-flash');
+                bubble.innerText = state.currentTrashTalk || "可惡...";
+                bubble.style.display = 'block';
+                setTimeout(() => {
+                    dmgText.classList.remove('dmg-float');
+                    document.getElementById('display-view').classList.remove('screen-shake', 'hurt-flash');
+                }, 1200);
+            }
+            showStats(state);
+        }
+    }
+
+    function showStats(state) {
+        const stats = state.stats || { A:0, B:0, C:0, D:0 };
+        const total = (stats.A + stats.B + stats.C + stats.D) || 1;
+        const currentQ = questionBank[state.q];
+        document.getElementById('msg-box').innerHTML = `
+            <div style="font-size: 38px; font-weight: bold; margin-bottom: 20px;">
+                <div style="color: #2ecc71;">任務成功率：${state.correctRate}%</div>
+                <div style="font-size: 50px; color: #e74c3c;">總傷害：${state.lastDmg}</div>
+            </div>
+            <div class="stat-container">
+                ${['A','B','C','D'].map(opt => {
+                    const isAns = currentQ.a.includes(opt);
+                    return `<div class="stat-row">
+                        <div class="stat-label ${isAns ? 'correct-text' : ''}">${opt}: ${currentQ.o[opt]} ${isAns ? '✅' : ''}</div>
+                        <div class="stat-bar-bg"><div class="stat-bar-fill ${isAns ? 'correct-fill' : ''}" style="width: ${(stats[opt]/total*100)}%"></div></div>
+                        <div class="stat-value">${stats[opt]} 人</div>
+                    </div>`;
+                }).join('')}
+            </div>`;
+    }
+
+    function updatePlayer(state) {
+        if(state.status === 'answering' && !hasSubmitted) {
+            const q = questionBank[state.q];
+            document.getElementById('player-waiting').classList.add('hidden');
+            document.getElementById('player-q-zone').classList.remove('hidden');
+            document.getElementById('p-title').innerText = q.t;
+            document.getElementById('pa').innerText = q.o.A; document.getElementById('pb').innerText = q.o.B;
+            document.getElementById('pc').innerText = q.o.C; document.getElementById('pd').innerText = q.o.D;
+        } else {
+            document.getElementById('player-q-zone').classList.add('hidden');
+            document.getElementById('player-waiting').classList.remove('hidden');
+            document.getElementById('wait-msg').innerText = hasSubmitted ? "攻擊準備中！💥" : "等待指揮官命令...";
+        }
+    }
+
+    function changeQ(num) {
+        db.ref('responses').remove();
         let timeLeft = 10;
         db.ref('gameState').update({ q: num, status: 'answering', lastDmg: 0, stats: null, timeLeft: timeLeft, currentTrashTalk: "" });
-        timerInterval = setInterval(() => {
+        const timer = setInterval(() => {
             timeLeft--;
-            if(timeLeft <= 0) { clearInterval(timerInterval); db.ref('gameState/timeLeft').set(0); }
+            if(timeLeft <= 0) { clearInterval(timer); db.ref('gameState/timeLeft').set(0); }
             else db.ref('gameState/timeLeft').set(timeLeft);
         }, 1000);
     }
@@ -376,32 +330,28 @@
     }
 
     function calculateResult() {
-        clearInterval(timerInterval);
         db.ref().once('value', snap => {
             const data = snap.val();
             const resps = data.responses || {};
-            const qNum = data.gameState.q;
-            const qData = questionBank[qNum];
-            if(Object.keys(resps).length === 0) return alert("還沒人集氣！");
-            db.ref('history').push({ qNum: qNum, players: resps });
+            const qData = questionBank[data.gameState.q];
             const players = Object.values(resps);
+            if(!players.length) return alert("還沒人集氣！");
+
             const stats = { A:0, B:0, C:0, D:0 };
-            players.forEach(p => { if(stats[p.ans] !== undefined) stats[p.ans]++; });
-            let correctCount = (qData.a === "ALL") ? players.length : players.filter(p => p.ans === qData.a).length;
-            let rate = Math.round((correctCount / players.length) * 100);
-            let dmg = Math.floor((rate / 100) * 1500);
+            players.forEach(p => stats[p.ans]++);
 
-            // 隨機抽選垃圾話
-            const randomTalk = trashTalks[Math.floor(Math.random() * trashTalks.length)];
+            const correctCount = players.filter(p => qData.a.includes(p.ans)).length;
+            const rate = Math.round((correctCount / players.length) * 100);
+            const dmg = Math.floor((rate / 100) * 1800);
 
+            db.ref('history').push({ qNum: data.gameState.q, players: resps });
             db.ref('gameState').update({ 
                 status: 'result', 
                 hp: Math.max(0, data.gameState.hp - dmg), 
                 lastDmg: dmg, 
                 correctRate: rate, 
-                stats: stats, 
-                timeLeft: 0,
-                currentTrashTalk: randomTalk // 寫入資料庫
+                stats: stats,
+                currentTrashTalk: trashTalks[Math.floor(Math.random() * trashTalks.length)]
             });
         });
     }
@@ -412,37 +362,28 @@
             const scores = {}; 
             Object.values(history).forEach(round => {
                 const correctAns = questionBank[round.qNum].a;
-                if(!round.players) return;
-                Object.values(round.players).forEach(pData => {
-                    if(pData.name) {
-                        if(!scores[pData.name]) scores[pData.name] = { count: 0, totalTime: 0 };
-                        if(correctAns === "ALL" || pData.ans === correctAns) {
-                            scores[pData.name].count += 1;
-                            scores[pData.name].totalTime += (pData.timeBonus || 0);
-                        }
+                Object.values(round.players || {}).forEach(p => {
+                    if(!scores[p.name]) scores[p.name] = { count: 0, totalTime: 0 };
+                    if(correctAns.includes(p.ans)) {
+                        scores[p.name].count++;
+                        scores[p.name].totalTime += (p.timeBonus || 0);
                     }
                 });
             });
             const sorted = Object.entries(scores).sort((a,b) => (b[1].count !== a[1].count) ? b[1].count - a[1].count : b[1].totalTime - a[1].totalTime);
             document.getElementById('mvp-announcement').classList.remove('hidden');
-            document.getElementById('mvp-list').innerHTML = sorted.slice(0, 8).map((p, i) => {
-                let icon = i === 0 ? "🥇" : (i === 1 ? "🥈" : (i === 2 ? "🥉" : "🎖️"));
-                return `<div style="margin:10px 0; display:flex; justify-content:space-between; padding:0 30px;">
-                    <span>${icon} <span style="color:white">${p[0]}</span></span>
-                    <span style="color:var(--primary)">${p[1].count} 任務完成 (${p[1].totalTime}s)</span>
-                </div>`;
-            }).join('');
+            document.getElementById('mvp-list').innerHTML = sorted.slice(0, 8).map((p, i) => 
+                `<div style="display:flex; justify-content:space-between; padding:5px 40px;"><span>No.${i+1} ${p[0]}</span><span>${p[1].count}題 | ${p[1].totalTime}s</span></div>`
+            ).join('');
         });
     }
 
     function resetGame() {
-        if(confirm("⚠ 注意：這將會清空所有數據並重置戰場。確定嗎？")) {
-            clearInterval(timerInterval);
+        if(confirm("重置戰場？")) {
             db.ref('/').update({
-                gameState: { q:0, status:'waiting', hp:12000, lastDmg: 0, correctRate: 0, stats: null, timeLeft: 10, currentTrashTalk: "" },
-                responses: null, history: null, players: null, resetTrigger: false 
-            }).then(() => db.ref('resetTrigger').set(true))
-            .then(() => setTimeout(() => { db.ref('resetTrigger').set(false); alert("戰場已完成初始化！"); }, 1500));
+                gameState: { q:0, status:'waiting', hp:BOSS_MAX_HP, lastDmg: 0, timeLeft: 10 },
+                responses: null, history: null, players: null, resetTrigger: true
+            }).then(() => setTimeout(() => db.ref('resetTrigger').set(false), 1000));
         }
     }
 </script>
