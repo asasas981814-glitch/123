@@ -69,6 +69,21 @@
         .player-btn:active { transform: translateY(3px); box-shadow: 0 2px #d35400; }
         .player-btn:disabled { background: #555; box-shadow: none; transform: translateY(5px); cursor: not-allowed; }
         #bgm-control { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.7); color: white; border: 1px solid #555; padding: 12px; border-radius: 10px; z-index: 1000; cursor: pointer; }
+
+        /* 老祖宗祝福特效 */
+        #blessing-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 215, 0, 0.4); z-index: 3000; display: flex; 
+            flex-direction: column; justify-content: center; align-items: center; 
+            text-align: center; backdrop-filter: blur(10px); animation: blessing-fade 0.5s ease-out;
+        }
+        .blessing-content {
+            background: white; color: #b8860b; padding: 50px; border-radius: 40px;
+            border: 12px double #ffd700; box-shadow: 0 0 60px #fff;
+            animation: blessing-pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes blessing-fade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes blessing-pop { from { transform: scale(0.5); } to { transform: scale(1); } }
     </style>
 </head>
 <body>
@@ -119,6 +134,17 @@
         <div style="position: absolute; width:100%; top:0; line-height:45px; font-weight:900; font-size: 24px; text-shadow: 1px 1px 2px #000;">HP: <span id="hp-text">10000</span> / 10000</div>
     </div>
 
+    <div id="blessing-overlay" class="hidden">
+        <div class="blessing-content">
+            <h1 style="font-size: 70px; margin: 0; color: #b8860b;">✨ 老祖宗降下祝福 ✨</h1>
+            <p style="font-size: 36px; line-height: 1.6; color: #444; font-weight: bold;">
+                戰士們尾牙中獎率大提升！<br>
+                <span style="color: #d4af37; font-size: 48px; text-shadow: 0 0 10px rgba(0,0,0,0.1);">「老祖宗，保佑我！」</span><br>
+                對 Boss 造成 <span style="color: #e74c3c; font-size: 50px;">5000</span> 點傷害
+            </p>
+        </div>
+    </div>
+
     <div id="mvp-announcement" class="q-card hidden" style="border-color: gold;">
         <h2 style="color: gold; font-size: 45px; margin: 10px 0;">🏆 戰場英雄榜 🏆</h2>
         <div id="mvp-list" style="font-size: 30px; line-height: 1.4;"></div>
@@ -137,7 +163,9 @@
     <h2>指揮官作戰面板</h2>
     <div id="admin-btns" style="background:#222; padding:20px; border-radius:15px; margin-bottom: 20px;"></div>
     <button onclick="calculateResult()" style="background:var(--success); color:white; width:85%; padding:25px; font-size:32px; border:none; border-radius:15px; font-weight: bold; cursor: pointer;">💥 全員發動攻擊！</button>
-    <br><br><br>
+    <br><br>
+    <button onclick="triggerBlessing()" style="background: linear-gradient(to bottom, #f1c40f, #d4af37); color: black; width: 85%; padding: 20px; font-size: 28px; border: none; border-radius: 15px; font-weight: bold; cursor: pointer; margin-bottom: 20px;">🧧 老祖宗的祝福 (扣5000HP)</button>
+    <br><br>
     <button onclick="resetGame()" style="background:#c0392b; color:white; padding:12px 24px; border:none; border-radius:5px; cursor: pointer;">💣 重置戰場 (全體刷新)</button>
 </div>
 
@@ -154,23 +182,22 @@
 
     const questionBank = {
         1: { t: "今天QMD Kick Off 的主持人帥嗎?", o: {A:"宇宙帥", B:"太陽系帥", C:"銀河系帥", D:"阿格力"}, a: "ALL" },
-    2: { t: "今年QMD Kick Off想要表達的主題為何?", o: {A:"Collaborating Forward Executing Together", B:"協做前行，齊心致遠", C:"一個人走的快，一群人走得遠", D:"以上皆是"}, a: "D" },
-    3: { t: "下列何者不是CMC鐵三角對於E2E料件管理的三大重點?", o: {A:"發展料區管理", B:"回應外部議題", C:"發展風險維度", D:"以成本當作優先評估重點"}, a: "D" },
-    4: { t: "何者不是PPAP的核心重點?", o: {A:"規格制訂&落地執行", B:"異常處理&問題解析", C:"策略執行&品質提升", D:"筆&鳳梨&蘋果"}, a: "D" },
-    5: { t: "何者不是電子與模組料區小組在2026年的重點工作?", o: {A:"DRAM & Main chip封裝產能對應措施", B:"鑽研AI硬體應用趨勢", C:"透過PFMEA水平展開提升能力", D:"落實 Power 選料原則"}, a: "B" },
-    6: { t: "下列何者不是DQA 2026的三大核心轉型?", o: {A:"效率革命", B:"價值提升", C:"組織重組", D:"增購設備"}, a: "D" },
-    7: { t: "TK的精美報告是使用了下列哪個AI平台輔助製作?", o: {A:"Grok", B:"ChatGPT", C:"NotebookLM", D:"Perplexity"}, a: "D" },
-    8: { t: "DPQM的關鍵任務-數位化轉型是自動化產出下列何者報告?", o: {A:"測試報告與MTBF報告", B:"DFEMA", C:"8D報告", D:"PFEMA報告"}, a: "A" },
-    9: { t: "Which of the following options is not one of the Strategies Pillars of PRCM?", o: {A:"Enhance Sustaining", B:"Better Service for Customer", C:"Build up Engineering Knowledge", D:"Pneumonoultramicro...volcanoconiosis"}, a: "D" },
-    10: { t: "Where the Knowledge Management of PRCM is?", o: {A:"GeDCC", B:"PDM", C:"PRCM Portal", D:"Moxa College"}, a: "C" },
-    11: { t: "Which of the following options is not Hard Skill of PRCM?", o: {A:"EMC&RF", B:"Safty&Hazloc", C:"Energy&Haz Substances", D:"Ontology&Epistemology"}, a: "D" },
-    12: { t: "品質與可靠度白皮書預計甚麼時候正式發布?", o: {A:"2026Q4", B:"已經完成正式發佈", C:"2027Q3", D:"2027Q2"}, a: "A" },
-    13: { t: "何者不是2025年的可靠度專案?", o: {A:"Nport 6150 Reliability", B:"Thin Gold Plated Contacts Effect", C:"PCB Supplier EISO enhancement", D:"Solder joint 20Y Reliability Test"}, a: "B" },
-    14: { t: "何者不是QRM 2026的測試與驗證計畫?", o: {A:"Conformal Coating 應力影響", B:"薄金鍍層接觸影響研究", C:"壓電材料散熱可靠度驗證", D:"產品PEL：電解電容驗證"}, a: "B" },
-    15: { t: "哪位同仁連續幾年參與表演，今年也會閃亮登台?", o: {A:"Jerry", B:"Lisa", C:"Boozer", D:"Dennis"}, a: "A" }
-};
+        2: { t: "今年QMD Kick Off想要表達的主題為何?", o: {A:"Collaborating Forward Executing Together", B:"協做前行，齊心致遠", C:"一個人走的快，一群人走得遠", D:"以上皆是"}, a: "D" },
+        3: { t: "下列何者不是CMC鐵三角對於E2E料件管理的三大重點?", o: {A:"發展料區管理", B:"回應外部議題", C:"發展風險維度", D:"以成本當作優先評估重點"}, a: "D" },
+        4: { t: "何者不是PPAP的核心重點?", o: {A:"規格制訂&落地執行", B:"異常處理&問題解析", C:"策略執行&品質提升", D:"筆&鳳梨&蘋果"}, a: "D" },
+        5: { t: "何者不是電子與模組料區小組在2026年的重點工作?", o: {A:"DRAM & Main chip封裝產能對應措施", B:"鑽研AI硬體應用趨勢", C:"透過PFMEA水平展開提升能力", D:"落實 Power 選料原則"}, a: "B" },
+        6: { t: "下列何者不是DQA 2026的三大核心轉型?", o: {A:"效率革命", B:"價值提升", C:"組織重組", D:"增購設備"}, a: "D" },
+        7: { t: "TK的精美報告是使用了下列哪個AI平台輔助製作?", o: {A:"Grok", B:"ChatGPT", C:"NotebookLM", D:"Perplexity"}, a: "D" },
+        8: { t: "DPQM的關鍵任務-數位化轉型是自動化產出下列何者報告?", o: {A:"測試報告與MTBF報告", B:"DFEMA", C:"8D報告", D:"PFEMA報告"}, a: "A" },
+        9: { t: "Which of the following options is not one of the Strategies Pillars of PRCM?", o: {A:"Enhance Sustaining", B:"Better Service for Customer", C:"Build up Engineering Knowledge", D:"Pneumonoultramicro...volcanoconiosis"}, a: "D" },
+        10: { t: "Where the Knowledge Management of PRCM is?", o: {A:"GeDCC", B:"PDM", C:"PRCM Portal", D:"Moxa College"}, a: "C" },
+        11: { t: "Which of the following options is not Hard Skill of PRCM?", o: {A:"EMC&RF", B:"Safty&Hazloc", C:"Energy&Haz Substances", D:"Ontology&Epistemology"}, a: "D" },
+        12: { t: "品質與可靠度白皮書預計甚麼時候正式發布?", o: {A:"2026Q4", B:"已經完成正式發佈", C:"2027Q3", D:"2027Q2"}, a: "A" },
+        13: { t: "何者不是2025年的可靠度專案?", o: {A:"Nport 6150 Reliability", B:"Thin Gold Plated Contacts Effect", C:"PCB Supplier EISO enhancement", D:"Solder joint 20Y Reliability Test"}, a: "B" },
+        14: { t: "何者不是QRM 2026的測試與驗證計畫?", o: {A:"Conformal Coating 應力影響", B:"薄金鍍層接觸影響研究", C:"壓電材料散熱可靠度驗證", D:"產品PEL：電解電容驗證"}, a: "B" },
+        15: { t: "哪位同仁連續幾年參與表演，今年也會閃亮登台?", o: {A:"Jerry", B:"Lisa", C:"Boozer", D:"Dennis"}, a: "A" }
+    };
 
-    // 新增垃圾話陣列
     const trashTalks = [
         "你們的力量只有這樣嗎?",
         "還敢自稱品質專業，這點攻擊像在刮痧!",
@@ -235,6 +262,35 @@
     let lastQNum = -1;
     let currentGlobalTimeLeft = 10;
 
+    // 監聽老祖宗祝福信號
+    db.ref('blessingTrigger').on('value', snap => {
+        if (snap.val() === true) {
+            if(role === 'display') {
+                const overlay = document.getElementById('blessing-overlay');
+                const bossImg = document.getElementById('boss-img');
+                const displayEl = document.getElementById('display-view');
+                overlay.classList.remove('hidden');
+                confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 }, colors: ['#FFD700', '#FFA500'] });
+
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                    displayEl.classList.add('screen-shake', 'hurt-flash');
+                    bossImg.classList.add('shake');
+                    const dmgText = document.getElementById('dmg-text');
+                    dmgText.innerText = "-5000";
+                    dmgText.style.fontSize = "160px";
+                    dmgText.classList.add('dmg-float');
+                    setTimeout(() => {
+                        displayEl.classList.remove('screen-shake', 'hurt-flash');
+                        bossImg.classList.remove('shake');
+                        dmgText.classList.remove('dmg-float');
+                    }, 1500);
+                }, 4000);
+            }
+            if(role === 'admin') { setTimeout(() => { db.ref('blessingTrigger').set(false); }, 5000); }
+        }
+    });
+
     db.ref('gameState').on('value', snap => {
         const state = snap.val() || { hp: 10000, status: 'waiting' };
         currentGlobalTimeLeft = state.timeLeft || 0;
@@ -265,7 +321,7 @@
         if(role === 'display') {
             const bossImg = document.getElementById('boss-img');
             const hpBar = document.getElementById('hp-bar');
-            const bubble = document.getElementById('boss-bubble'); // 對話框
+            const bubble = document.getElementById('boss-bubble'); 
             const hpPercent = (state.hp/10000*100);
             hpBar.style.width = hpPercent + "%";
             document.getElementById('hp-text').innerText = state.hp;
@@ -274,7 +330,7 @@
 
             if(state.hp <= 0) {
                 bossImg.src = "Boss_hurt.png"; bossImg.style.transform = "scale(0) rotate(720deg)";
-                bubble.style.display = 'none'; // 死亡隱藏氣泡
+                bubble.style.display = 'none'; 
                 confetti({ particleCount: 400, spread: 100, origin: { y: 0.6 } });
                 findMVP(); document.getElementById('round-num').innerText = "VICTORY!";
             } else {
@@ -289,7 +345,7 @@
                 document.getElementById('d-options').innerHTML = `<div>A: ${q.o.A}</div><div>B: ${q.o.B}</div><div>C: ${q.o.C}</div><div>D: ${q.o.D}</div>`;
                 document.getElementById('msg-box').innerHTML = "";
                 document.getElementById('round-num').innerText = "任務進行中...";
-                bubble.style.display = 'none'; // 開始作答隱藏氣泡
+                bubble.style.display = 'none'; 
             } else if(state.status === 'result') {
                 document.getElementById('display-q-box').classList.add('hidden');
                 if(state.lastDmg > 0) {
@@ -301,7 +357,6 @@
                     dmgText.style.fontSize = state.lastDmg > 1000 ? "130px" : "80px";
                     dmgText.classList.add('dmg-float');
                     
-                    // 顯示垃圾話氣泡
                     if(state.currentTrashTalk) {
                         bubble.innerText = state.currentTrashTalk;
                         bubble.style.display = 'block';
@@ -396,7 +451,6 @@
             let rate = Math.round((correctCount / players.length) * 100);
             let dmg = Math.floor((rate / 100) * 1000);
 
-            // 隨機抽選垃圾話
             const randomTalk = trashTalks[Math.floor(Math.random() * trashTalks.length)];
 
             db.ref('gameState').update({ 
@@ -406,8 +460,18 @@
                 correctRate: rate, 
                 stats: stats, 
                 timeLeft: 0,
-                currentTrashTalk: randomTalk // 寫入資料庫
+                currentTrashTalk: randomTalk 
             });
+        });
+    }
+
+    function triggerBlessing() {
+        if(!confirm("確定要請出老祖宗嗎？這將造成 5000 點傷害！")) return;
+        db.ref().once('value', snap => {
+            const currentHP = snap.val().gameState.hp;
+            const newHP = Math.max(0, currentHP - 5000);
+            db.ref('gameState').update({ hp: newHP, lastDmg: 5000 });
+            db.ref('blessingTrigger').set(true);
         });
     }
 
@@ -445,7 +509,7 @@
             clearInterval(timerInterval);
             db.ref('/').update({
                 gameState: { q:0, status:'waiting', hp:10000, lastDmg: 0, correctRate: 0, stats: null, timeLeft: 10, currentTrashTalk: "" },
-                responses: null, history: null, players: null, resetTrigger: false 
+                responses: null, history: null, players: null, resetTrigger: false, blessingTrigger: false
             }).then(() => db.ref('resetTrigger').set(true))
             .then(() => setTimeout(() => { db.ref('resetTrigger').set(false); alert("戰場已完成初始化！"); }, 1000));
         }
